@@ -1,6 +1,6 @@
-=====
+========
 deeppath
-=====
+========
 
 
 .. image:: https://img.shields.io/pypi/v/deeppath.svg
