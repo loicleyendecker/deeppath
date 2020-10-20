@@ -2,6 +2,6 @@
 Usage
 =====
 
-To use dpath in a project::
+To use deeppath in a project::
 
-    import dpath
+    import deeppath

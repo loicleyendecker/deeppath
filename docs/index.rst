@@ -1,4 +1,4 @@
-Welcome to dpath's documentation!
+Welcome to deeppath's documentation!
 ======================================
 
 .. toctree::

@@ -1,21 +1,21 @@
 =====
-dpath
+deeppath
 =====
 
 
-.. image:: https://img.shields.io/pypi/v/dpath.svg
-        :target: https://pypi.python.org/pypi/dpath
+.. image:: https://img.shields.io/pypi/v/deeppath.svg
+        :target: https://pypi.python.org/pypi/deeppath
 
-.. image:: https://img.shields.io/travis/loicleyendecker/dpath.svg
-        :target: https://travis-ci.com/loicleyendecker/dpath
+.. image:: https://img.shields.io/travis/loicleyendecker/deeppath.svg
+        :target: https://travis-ci.com/loicleyendecker/deeppath
 
-.. image:: https://readthedocs.org/projects/dpath/badge/?version=latest
-        :target: https://dpath.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/deeppath/badge/?version=latest
+        :target: https://deeppath.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
 
-.. image:: https://pyup.io/repos/github/loicleyendecker/dpath/shield.svg
-     :target: https://pyup.io/repos/github/loicleyendecker/dpath/
+.. image:: https://pyup.io/repos/github/loicleyendecker/deeppath/shield.svg
+     :target: https://pyup.io/repos/github/loicleyendecker/deeppath/
      :alt: Updates
 
 
@@ -24,7 +24,7 @@ Python module to easily manipulate complex nested structures
 
 
 * Free software: MIT license
-* Documentation: https://dpath.readthedocs.io.
+* Documentation: https://deeppath.readthedocs.io.
 
 
 Features
