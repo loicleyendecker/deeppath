@@ -101,5 +101,8 @@ def _dwalk_with_path(data, path):
 
 
 def dwalk(data):
-    """Generator that will yield values for each path to a leaf of a nested structure"""
+    """
+    Generator that will yield values for each path to a leaf of a nested
+    structure
+    """
     yield from _dwalk_with_path(data, [])
