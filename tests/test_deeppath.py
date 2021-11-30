@@ -42,10 +42,7 @@ def test_dget_flatten_list():
     """
     Check flattening a list
     """
-    data = [
-        {"a": [1, 2]},
-        {"b": [3, 4]}
-    ]
+    data = [{"a": [1, 2]}, {"b": [3, 4]}]
     assert dget(data, "[*]") == data
     assert dget(data, "[*]/a") == [[1, 2]]
     assert dget(data, "[*]/a[*]") == [1, 2]
@@ -58,43 +55,22 @@ def test_dget_flatten_incompatible_list_dict():
     What happens if you flatten a dict with list syntax, or a list with
     dict syntax ?
     """
-    data = {
-        "list": [1, 2],
-        "dict": {"1": 1, "2": 2}
-    }
+    data = {"list": [1, 2], "dict": {"1": 1, "2": 2}}
     assert dget(data, "list/*") is None
     assert dget(data, "dict[*]") is None
 
 
 @pytest.mark.skip
 def test_dget_double_flatten():
-    data = {
-        "a": {
-            "b": {
-                "c": 1
-            },
-            "b2": {
-                "c": 2
-            }
-        }
-    }
-    assert dget(data, "*") == [{'b': {'c': 1}, 'b2': {'c': 2}}]
-    assert dget(data, "*/*") == [{'c': 1}, {'c': 2}]
+    data = {"a": {"b": {"c": 1}, "b2": {"c": 2}}}
+    assert dget(data, "*") == [{"b": {"c": 1}, "b2": {"c": 2}}]
+    assert dget(data, "*/*") == [{"c": 1}, {"c": 2}]
     assert dget(data, "*/*/c") == [1, 2]
 
 
 @pytest.mark.skip
 def test_dget_flatten_excludes_unmatched_path():
-    data = {
-        "a": {
-            "b": {
-                "c": 1
-            },
-            "b2": {
-                "c": 2
-            }
-        }
-    }
+    data = {"a": {"b": {"c": 1}, "b2": {"c": 2}}}
     assert dget(data, "*/b2/*") == [2]
 
 
@@ -115,18 +91,10 @@ def test_dget_flatten_and_repetition():
         {
             "nested_in_rep": 1,
         },
-        {
-            "nested_in_rep": 2,
-            "other_nested": {"other": 3}
-        }
+        {"nested_in_rep": 2, "other_nested": {"other": 3}},
     ]
-    data1 = {
-        "flattened": reps
-    }
-    data2 = {
-        "a": [1, 2],
-        "b": [3, 4]
-    }
+    data1 = {"flattened": reps}
+    data2 = {"a": [1, 2], "b": [3, 4]}
     assert dget(data1, "*") == [reps]
     assert dget(data1, "flattened[0]") == {"nested_in_rep": 1}
     # */ is a list, it needs explicit unfold
