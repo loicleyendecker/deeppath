@@ -6,3 +6,8 @@ History
 ------------------
 
 * First release on PyPI.
+
+0.1.2 (2021-11-30)
+------------------
+
+* Added flatten, used to wrap dget for flatten nested lists.

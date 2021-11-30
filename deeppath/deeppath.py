@@ -2,8 +2,10 @@
 Support some XPath-like syntax for accessing nested structures
 """
 
-from typing import Sequence, MutableSequence, Mapping
 import re
+from typing import List, Mapping, MutableSequence, Sequence
+
+_REPETITION_REGEX = re.compile(r"([\w\*]+)\[([\d-]+)\]")
 
 
 def _flatdget(data, key):
@@ -12,7 +14,17 @@ def _flatdget(data, key):
     return [_flatdget(value, key) for value in data]
 
 
-_REPETITION_REGEX = re.compile(r"([\w\*]+)\[([\d-]+)\]")
+def flatten(nested_iterable: List):
+    """Flattens a nested list.
+    E.g [[[[[1]]]],[2]] -> [1,2]
+    """
+    flattened_list = list()
+    for item in nested_iterable:
+        if isinstance(item, list):
+            flattened_list.extend(flatten(item))
+        else:
+            flattened_list.append(item)
+    return flattened_list
 
 
 def _get_repetition_index(key):
@@ -101,8 +113,5 @@ def _dwalk_with_path(data, path):
 
 
 def dwalk(data):
-    """
-    Generator that will yield values for each path to a leaf of a nested
-    structure
-    """
+    """Generator that will yield values for each path to a leaf of a nested structure"""
     yield from _dwalk_with_path(data, [])
