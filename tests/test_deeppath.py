@@ -8,6 +8,34 @@ import pytest
 
 from deeppath import dget, dset, dwalk, flatten
 
+@dataclass(frozen=True)
+class Person:
+    name: str
+    age: int
+    birthday: datetime.datetime
+
+    @classmethod
+    def from_dict(cls, data, **kwargs):
+        """
+        Read from `data` and initialise a new `Person` object
+        """
+        name = dget(data, "deeply/nested/name")
+        age = int(dget(data, "somewhere/else/age"))
+        birthday = datetime.date(*dget(data, "other/location/birthday/*"))
+        return cls(name, age, birthday, **kwargs)
+
+@dataclass(frozen=True)
+class InterestedPerson(Person):
+    """A normal person with a list of hobbies"""
+
+    hobbies: List[str]
+
+    @classmethod
+    def from_dict(cls, data, **kwargs):
+        hobbies = dget(data, "list/of/hobbies/*/title")
+        additional_args = {**kwargs, "hobbies": hobbies}
+        return super().from_dict(data, **additional_args)
+
 
 def test_dget_basic():
     """Basic test, with and without default value"""
@@ -104,7 +132,7 @@ def test_dget_flatten_and_repetition():
     assert dget(data2, "*/a") is None
 
 
-@pytest.mark.skip
+
 def test_dget_flatten():
     """Check that we can successfully flatten a nested structure"""
     data = {"deeply": {"nested": [{"path": 2}, {"path": 3}, {"path": 4}]}}
@@ -113,23 +141,6 @@ def test_dget_flatten():
         "deeply": {"nested": {"path": 2}, "other": {"path": 3}, "more": {"path": 4}}
     }
     assert dget(data, "deeply/*/path") == [2, 3, 4]
-
-
-@dataclass
-class Person:
-    name: str
-    age: int
-    birthday: datetime.datetime
-
-    @classmethod
-    def from_dict(cls, data, **kwargs):
-        """
-        Read from `data` and initialise a new `Person` object
-        """
-        name = dget(data, "deeply/nested/name")
-        age = int(dget(data, "somewhere/else/age"))
-        birthday = datetime.date(*dget(data, "other/location/birthday/*"))
-        return cls(name, age, birthday, **kwargs)
 
 
 def test_decoded_classes():
@@ -145,18 +156,6 @@ def test_decoded_classes():
 
 def test_extended_class():
     """Extend a class and validate the whole decoding logic still works"""
-
-    @dataclass
-    class InterestedPerson(Person):
-        """A normal person with a list of hobbies"""
-
-        hobbies: List[str]
-
-        @classmethod
-        def from_dict(cls, data, **kwargs):
-            hobbies = dget(data, "list/of/hobbies/*/title")
-            additional_args = {**kwargs, "hobbies": hobbies}
-            return super().from_dict(data, **additional_args)
 
     data = {
         "deeply": {"nested": {"name": "John"}},

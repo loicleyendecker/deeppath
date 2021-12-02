@@ -1,24 +1,30 @@
-"""
-Support some XPath-like syntax for accessing nested structures
-"""
+"""Support some XPath-like syntax for accessing nested structures"""
 
 import re
-from typing import List, Mapping, MutableSequence, Sequence
+from typing import (
+    Generator,
+    List,
+    Mapping,
+    MutableSequence,
+    Sequence,
+    Iterable,
+    Any,
+    Union,
+    Optional,
+    Tuple,
+    Dict,
+)
 
 _REPETITION_REGEX = re.compile(r"([\w\*]+)\[([\d-]+)\]")
 
-
-def _flatdget(data, key):
-    if not isinstance(data, Sequence) or isinstance(key, int):
-        return data[key]
-    return [_flatdget(value, key) for value in data]
+JsonData = Dict[str, Any]
 
 
-def flatten(nested_iterable: List):
+def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
     """Flattens a nested list.
     E.g [[[[[1]]]],[2]] -> [1,2]
     """
-    flattened_list = list()
+    flattened_list = []
     for item in nested_iterable:
         if isinstance(item, list):
             flattened_list.extend(flatten(item))
@@ -27,7 +33,7 @@ def flatten(nested_iterable: List):
     return flattened_list
 
 
-def _get_repetition_index(key):
+def _get_repetition_index(key: str) -> Optional[Tuple[str, int]]:
     """Try to match a path for a repetition.
     This will return the key and the repetition index or None if the key
     does not match the expected regex"""
@@ -37,14 +43,23 @@ def _get_repetition_index(key):
         repetition_number = match.group(2)
         return key, int(repetition_number)
 
+    return None
 
-def dget(data, path, default=None):
-    """
-    Gets a deeply nested value in a dictionary.
+
+def _flatdget(data: Union[Sequence[Any], JsonData, str], key: Union[int, str]) -> Any:
+    if isinstance(data, Sequence) and isinstance(key, int):
+        return data[key]
+    if isinstance(data, Dict) and isinstance(key, str):
+        return data[key]
+    return [_flatdget(value, key) for value in data]
+
+
+def dget(input_dict: JsonData, path: str, default: Any = None) -> Any:
+    """Gets a deeply nested value in a dictionary.
     Returns default if provided when any key doesn't match.
     """
-    if path.startswith("/"):
-        path = path[1:]
+    path = path.strip("/")
+    data: Union[List[Any], JsonData] = input_dict
     try:
         for key in path.split("/"):
             repetition = _get_repetition_index(key)
@@ -53,20 +68,23 @@ def dget(data, path, default=None):
                 if key != "*":
                     data = _flatdget(data, key)
                     data = _flatdget(data, index)
-                else:
+                elif isinstance(data, Dict):
                     data = [_flatdget(value, index) for value in data.values()]
             else:
                 if key != "*":
                     data = _flatdget(data, key)
-                else:
-                    if not isinstance(data, Sequence):
-                        data = [value for value in data.values()]
+                elif not isinstance(data, Sequence):
+                    data = list(data.values())
     except (KeyError, TypeError, IndexError):
         return default
     return data
 
 
-def dset(data, path, value):
+def dset(
+    data: JsonData,
+    path: str,
+    value: Any,
+) -> None:
     """Set a key in a deeply nested structure"""
     if path.startswith("/"):
         path = path[1:]
@@ -98,7 +116,9 @@ def dset(data, path, value):
                 data[key][index] = value
 
 
-def _dwalk_with_path(data, path):
+def _dwalk_with_path(
+    data: JsonData, path: List[str]
+) -> Generator[Tuple[str, JsonData], None, None]:
     if isinstance(data, Mapping):
         for key, value in data.items():
             subpath = path + [key]
@@ -112,6 +132,6 @@ def _dwalk_with_path(data, path):
         yield "/".join(path), data
 
 
-def dwalk(data):
+def dwalk(data: Dict[str, Any]) -> Generator[Tuple[str, JsonData], None, None]:
     """Generator that will yield values for each path to a leaf of a nested structure"""
     yield from _dwalk_with_path(data, [])

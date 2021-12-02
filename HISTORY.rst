@@ -10,4 +10,10 @@ History
 0.1.2 (2021-11-30)
 ------------------
 
-* Added flatten, used to wrap dget for flatten nested lists.
+* Added flatten. To flatten nested lists (returned by dget).
+
+0.1.3 (2021-12-2)
+------------------
+
+* Allow trailing forward slash in second argument of dget
+* Added type hints
