@@ -5,6 +5,7 @@ from typing import (
     Generator,
     List,
     Mapping,
+    MutableMapping,
     MutableSequence,
     Sequence,
     Iterable,
@@ -16,8 +17,6 @@ from typing import (
 )
 
 _REPETITION_REGEX = re.compile(r"([\w\*]+)\[([\d-]+)\]")
-
-JsonData = Dict[str, Any]
 
 
 def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
@@ -46,20 +45,20 @@ def _get_repetition_index(key: str) -> Optional[Tuple[str, int]]:
     return None
 
 
-def _flatdget(data: Union[Sequence[Any], JsonData, str], key: Union[int, str]) -> Any:
+def _flatdget(data: Union[Sequence[Any], Mapping, str], key: Union[int, str]) -> Any:
     if isinstance(data, Sequence) and isinstance(key, int):
         return data[key]
-    if isinstance(data, Dict) and isinstance(key, str):
+    if isinstance(data, Mapping) and isinstance(key, str):
         return data[key]
     return [_flatdget(value, key) for value in data]
 
 
-def dget(input_dict: JsonData, path: str, default: Any = None) -> Any:
-    """Gets a deeply nested value in a dictionary.
+def dget(input_dict: Mapping, path: str, default: Any = None) -> Any:
+    """Gets a deeply nested value in a mapping.
     Returns default if provided when any key doesn't match.
     """
     path = path.strip("/")
-    data: Union[List[Any], JsonData] = input_dict
+    data: Union[List[Any], Mapping] = input_dict
     try:
         for key in path.split("/"):
             repetition = _get_repetition_index(key)
@@ -81,7 +80,7 @@ def dget(input_dict: JsonData, path: str, default: Any = None) -> Any:
 
 
 def dset(
-    data: JsonData,
+    data: MutableMapping,
     path: str,
     value: Any,
 ) -> None:
@@ -117,8 +116,8 @@ def dset(
 
 
 def _dwalk_with_path(
-    data: JsonData, path: List[str]
-) -> Generator[Tuple[str, JsonData], None, None]:
+    data: Mapping, path: List[str]
+) -> Generator[Tuple[str, Mapping], None, None]:
     if isinstance(data, Mapping):
         for key, value in data.items():
             subpath = path + [key]
@@ -132,6 +131,6 @@ def _dwalk_with_path(
         yield "/".join(path), data
 
 
-def dwalk(data: Dict[str, Any]) -> Generator[Tuple[str, JsonData], None, None]:
+def dwalk(data: Dict[str, Any]) -> Generator[Tuple[str, Mapping], None, None]:
     """Generator that will yield values for each path to a leaf of a nested structure"""
     yield from _dwalk_with_path(data, [])
