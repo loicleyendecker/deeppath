@@ -17,3 +17,8 @@ History
 
 * Allow trailing forward slash in second argument of dget
 * Added type hints
+
+0.1.4 (2021-12-15)
+------------------
+
+* Bug fix: Allow ``dget`` to use any ``typing.Mapping`` as input (fixed regression introduced in 0.1.3)
