@@ -16,7 +16,8 @@ from typing import (
     Dict,
 )
 
-_REPETITION_REGEX = re.compile(r"([\w\*]+)\[([\d-]+)\]")
+_REPETITION_REGEX = re.compile(r"([\w\*]*)\[([\d\-\*]+)\]")
+TOKENIZER_REGEX = re.compile(r"(\[[^\]]+\]|[^/\[\]]+)")
 
 
 def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
@@ -32,7 +33,7 @@ def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
     return flattened_list
 
 
-def _get_repetition_index(key: str) -> Optional[Tuple[str, int]]:
+def _get_repetition_index(key: str) -> Optional[Tuple[str, Union[int, str]]]:
     """Try to match a path for a repetition.
     This will return the key and the repetition index or None if the key
     does not match the expected regex"""
@@ -40,43 +41,70 @@ def _get_repetition_index(key: str) -> Optional[Tuple[str, int]]:
     if match:
         key = match.group(1)
         repetition_number = match.group(2)
-        return key, int(repetition_number)
+        if repetition_number != "*":
+            return key, int(repetition_number)
+        return key, repetition_number
 
     return None
 
 
-def _flatdget(data: Union[Sequence[Any], Mapping, str], key: Union[int, str]) -> Any:
-    if isinstance(data, Sequence) and isinstance(key, int):
-        return data[key]
-    if isinstance(data, Mapping) and isinstance(key, str):
-        return data[key]
-    return [_flatdget(value, key) for value in data]
+def _get_sequence_index(path: str) -> Tuple[bool, Union[None, int, str]]:
+    match = re.match(r"\[(-?[\d\*]+)\]", path)
+    if match:
+        index = match.group(1)
+        if index.isnumeric() or index[0] == "-" and index[1:].isnumeric():
+            return True, int(index)
+        else:
+            return True, index
+    if path == "*":
+        return False, "*"
+    return False, None
 
 
-def dget(input_dict: Mapping, path: str, default: Any = None) -> Any:
-    """Gets a deeply nested value in a mapping.
-    Returns default if provided when any key doesn't match.
-    """
-    path = path.strip("/")
-    data: Union[List[Any], Mapping] = input_dict
-    try:
-        for key in path.split("/"):
-            repetition = _get_repetition_index(key)
-            if repetition:
-                key, index = repetition
-                if key != "*":
-                    data = _flatdget(data, key)
-                    data = _flatdget(data, index)
-                elif isinstance(data, Dict):
-                    data = [_flatdget(value, index) for value in data.values()]
-            else:
-                if key != "*":
-                    data = _flatdget(data, key)
-                elif not isinstance(data, Sequence):
-                    data = list(data.values())
-    except (KeyError, TypeError, IndexError):
+def dget(
+    data: Dict[str, Any], path: str, default: Optional[Any] = None
+) -> Union[List[Any], Any]:
+    repetition_flag = False
+    tokenized_path = TOKENIZER_REGEX.findall(path)
+    nodes = [(data, tokenized_path)]
+    output = []
+    while nodes:
+        node, remainder = nodes.pop(0)
+        if not remainder:
+            output.append(node)
+            continue
+        next_path, *remainder = remainder
+        if not next_path:
+            continue
+
+        sequence, index = _get_sequence_index(next_path)
+        if index == "*":
+            repetition_flag = True
+            if not sequence and isinstance(node, Mapping):
+                for value in node.values():
+                    nodes.append((value, remainder))
+            elif sequence and isinstance(node, Sequence):
+                nodes.extend((val, remainder) for val in node)
+        else:
+            if index is None:
+                try:
+                    nodes.append((node[next_path], remainder))
+                except (KeyError, TypeError):
+                    pass
+            elif isinstance(index, int) and isinstance(node, Sequence):
+                try:
+                    nodes.append((node[index], remainder))
+                except IndexError:
+                    pass
+
+    # If there was an explicit repetition in the path (a "*"), then we return a
+    # list, otherwise, we return a single element
+    if repetition_flag:
+        return output
+    elif output:
+        return output[0]
+    else:
         return default
-    return data
 
 
 def dset(
