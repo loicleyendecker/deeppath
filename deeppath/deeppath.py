@@ -1,23 +1,31 @@
 """Support some XPath-like syntax for accessing nested structures"""
 
+from lib2to3.pytree import Leaf
 import re
 from typing import (
+    Dict,
     Generator,
     List,
     Mapping,
-    MutableMapping,
     MutableSequence,
     Sequence,
     Iterable,
     Any,
+    TypeVar,
     Union,
     Optional,
     Tuple,
-    Dict,
+    cast,
 )
+
+from deeppath.tree import Tree, MutableTree
 
 _REPETITION_REGEX = re.compile(r"([\w\*]*)\[([\d\-\*]+)\]")
 TOKENIZER_REGEX = re.compile(r"(\[[^\]]+\]|[^/\[\]]+)")
+
+
+class InvalidPath(Exception):
+    """Exception raised when the supplied path is not valid for a given object"""
 
 
 def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
@@ -54,19 +62,26 @@ def _get_sequence_index(path: str) -> Tuple[bool, Union[None, int, str]]:
         index = match.group(1)
         if index.isnumeric() or index[0] == "-" and index[1:].isnumeric():
             return True, int(index)
-        else:
-            return True, index
+        return True, index
     if path == "*":
         return False, "*"
     return False, None
 
 
+LeafValue = TypeVar("LeafValue")
+
+
 def dget(
-    data: Dict[str, Any], path: str, default: Optional[Any] = None
-) -> Union[List[Any], Any]:
+    data: Tree[str, LeafValue], path: str, default: Optional[LeafValue] = None
+) -> Union[
+    List[Union[LeafValue, Tree[str, LeafValue]]], Tree[str, LeafValue], LeafValue, None
+]:
+    "Gets a value or repetition from a nested structure"
     repetition_flag = False
-    tokenized_path = TOKENIZER_REGEX.findall(path)
-    nodes = [(data, tokenized_path)]
+    tokenized_path: List[str] = TOKENIZER_REGEX.findall(path)
+    nodes: List[Tuple[Union[LeafValue, Tree[str, LeafValue]], List[str]]] = [
+        (data, tokenized_path)
+    ]
     output = []
     while nodes:
         node, remainder = nodes.pop(0)
@@ -87,10 +102,11 @@ def dget(
                 nodes.extend((val, remainder) for val in node)
         else:
             if index is None:
-                try:
-                    nodes.append((node[next_path], remainder))
-                except (KeyError, TypeError):
-                    pass
+                if isinstance(node, Mapping):
+                    try:
+                        nodes.append((node[next_path], remainder))
+                    except KeyError:
+                        pass
             elif isinstance(index, int) and isinstance(node, Sequence):
                 try:
                     nodes.append((node[index], remainder))
@@ -101,33 +117,45 @@ def dget(
     # list, otherwise, we return a single element
     if repetition_flag:
         return output
-    elif output:
+    if output:
         return output[0]
-    else:
-        return default
+    return default
 
 
 def dset(
-    data: MutableMapping,
+    data: MutableTree[str, LeafValue],
     path: str,
-    value: Any,
+    value: Union[Tree[str, LeafValue], LeafValue],
 ) -> None:
     """Set a key in a deeply nested structure"""
     if path.startswith("/"):
         path = path[1:]
     for key in path.split("/")[:-1]:
         subpath = _get_repetition_index(key)
+        if not isinstance(data, MutableTree):
+            raise InvalidPath(path)
         if not subpath:
             if key not in data:
-                data[key] = {}
-            data = data[key]
+                empty_dict: MutableTree[str, LeafValue] = {}
+                reveal_type(empty_dict)
+                data[key] = empty_dict
+            next_data = data[key]
+            if not isinstance(next_data, MutableTree):
+                raise InvalidPath(path)  # TODO: improve error message
+            data = next_data
         else:
             key, index = subpath
             if key not in data:
                 data[key] = [{}]
-            elif len(data[key]) == index:
-                data[key].append({})
-            data = data[key][index]
+            val = data[key]
+            if not isinstance(val, MutableTree):
+                raise InvalidPath(path)  # TODO: improve error message
+            data = val
+            if not isinstance(data, Sequence):
+                raise InvalidPath(path)  # TODO: improve error message
+            if len(data) == index:
+                val.append({})
+            data = val[index]
 
     last = _get_repetition_index(path.split("/")[-1])
     if not last:
@@ -137,15 +165,18 @@ def dset(
         if key not in data:
             data[key] = [value]
         else:
-            if len(data[key]) == index:
-                data[key].append(value)
+            data = data[key]
+            if not isinstance(data, Sequence):
+                raise InvalidPath(path)  # TODO: improve error message
+            if len(data) == index:
+                data.append(value)
             else:
-                data[key][index] = value
+                data[index] = value
 
 
 def _dwalk_with_path(
-    data: Mapping, path: List[str]
-) -> Generator[Tuple[str, Mapping], None, None]:
+    data: Tree[str, LeafValue], path: List[str]
+) -> Generator[Tuple[str, Tree[str, LeafValue]], None, None]:
     if isinstance(data, Mapping):
         for key, value in data.items():
             subpath = path + [key]
@@ -159,6 +190,6 @@ def _dwalk_with_path(
         yield "/".join(path), data
 
 
-def dwalk(data: Dict[str, Any]) -> Generator[Tuple[str, Mapping], None, None]:
+def dwalk(data: Tree[str, LeafValue]) -> Generator[Tuple[str, Tree[str, LeafValue]], None, None]:
     """Generator that will yield values for each path to a leaf of a nested structure"""
     yield from _dwalk_with_path(data, [])
