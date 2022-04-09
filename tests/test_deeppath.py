@@ -8,6 +8,7 @@ import pytest
 
 from deeppath import dget, dset, dwalk, flatten
 
+
 @dataclass(frozen=True)
 class Person:
     name: str
@@ -23,6 +24,7 @@ class Person:
         age = int(dget(data, "somewhere/else/age"))
         birthday = datetime.date(*dget(data, "other/location/birthday/*"))
         return cls(name, age, birthday, **kwargs)
+
 
 @dataclass(frozen=True)
 class InterestedPerson(Person):
@@ -132,7 +134,6 @@ def test_dget_flatten_and_repetition():
     assert dget(data2, "*/a") is None
 
 
-
 def test_dget_flatten():
     """Check that we can successfully flatten a nested structure"""
     data = {"deeply": {"nested": [{"path": 2}, {"path": 3}, {"path": 4}]}}
@@ -219,6 +220,48 @@ def test_dwalk():
         ("nested/other", 2),
         ("repetition[0]", "repetition1"),
         ("repetition[1]/inside", "repetition"),
+    ]
+
+
+@pytest.mark.xfail(
+    strict=True, reason="dget assumes dicts in lists have the same structure"
+)
+def test_dget_heterogenous_dicts_in_list():
+    """dget shouldn't assume all dicts in a list have the same structure. However, this may have
+    wider implications. A design decision is required as this behaviour is now becoming controversial
+    since if you dget a list with 5 dicts but the key exists in 3 out of 5, how long should the list
+    be. If you say three well how do you know which value belongs to which dict, if you say five then
+    we need to design on a default value."""
+    complex_dict = [
+        {
+            "eventID": "123",
+            "entries": [
+                {"type": "message", "data": {"formatted": "some-error-str"}},
+                {
+                    "type": "exception",
+                    "data": {"values": [{"stacktrace": {"err": "why"}}]},
+                },
+            ],
+        }
+    ]
+    assert dget(complex_dict, "entries") == [
+        [
+            {"type": "message", "data": {"formatted": "some-error-str"}},
+            {
+                "type": "exception",
+                "data": {"values": [{"stacktrace": {"err": "why"}}]},
+            },
+        ]
+    ]
+    # with the new PR https://github.com/loicleyendecker/deeppath/pull/8
+    # I think the below assertion fails which means we have a regression.
+    assert dget(complex_dict, "entries/data") == [
+        [{"formatted": "some-error-str"}, {"values": [{"stacktrace": {"err": "why"}}]}]
+    ]
+    # The assertion below fails
+    # dget assumes each dict has the same key, when it doesn't it fails as below.
+    assert dget(complex_dict, "entries/data/values") == [
+        [[{"stacktrace": {"err": "why"}}]]
     ]
 
 
