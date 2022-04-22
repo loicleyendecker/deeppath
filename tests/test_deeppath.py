@@ -8,6 +8,7 @@ import pytest
 
 from deeppath import dget, dset, dwalk, flatten
 
+
 @dataclass(frozen=True)
 class Person:
     name: str
@@ -23,6 +24,7 @@ class Person:
         age = int(dget(data, "somewhere/else/age"))
         birthday = datetime.date(*dget(data, "other/location/birthday/*"))
         return cls(name, age, birthday, **kwargs)
+
 
 @dataclass(frozen=True)
 class InterestedPerson(Person):
@@ -132,7 +134,6 @@ def test_dget_flatten_and_repetition():
     assert dget(data2, "*/a") is None
 
 
-
 def test_dget_flatten():
     """Check that we can successfully flatten a nested structure"""
     data = {"deeply": {"nested": [{"path": 2}, {"path": 3}, {"path": 4}]}}
@@ -230,3 +231,23 @@ def test_flatten():
     assert flatten([[{"documentDetails": {"number": "0"}}]]) == [
         {"documentDetails": {"number": "0"}}
     ]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "some_key",
+        "2@3@4",
+        "2.3.4",
+        "2-3-4",
+        "2-3.4",
+        "2-3 4",
+        "2.3 4",
+        "2 3 4_5",
+    ],
+)
+def test_dset_with_dots(key, faker):
+    d = dict()
+    value = faker.name()
+    dset(d, f"1/{key}[0]", value)
+    assert d == {"1": {key: [value]}}

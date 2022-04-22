@@ -1,22 +1,25 @@
 """Support some XPath-like syntax for accessing nested structures"""
 
 import re
+from logging import getLogger
 from typing import (
+    Any,
+    Dict,
     Generator,
+    Iterable,
     List,
     Mapping,
     MutableMapping,
     MutableSequence,
-    Sequence,
-    Iterable,
-    Any,
-    Union,
     Optional,
+    Sequence,
     Tuple,
-    Dict,
+    Union,
 )
 
-_REPETITION_REGEX = re.compile(r"([\w\*]+)\[([\d-]+)\]")
+_REPETITION_REGEX = re.compile(r"([^\[]+)\[([\d-]+)\]")
+
+_logger = getLogger(__name__)
 
 
 def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
@@ -38,6 +41,7 @@ def _get_repetition_index(key: str) -> Optional[Tuple[str, int]]:
     does not match the expected regex"""
     match = _REPETITION_REGEX.search(key)
     if match:
+        _logger.debug("key=%s, match groups=%s", key, match.groups())
         key = match.group(1)
         repetition_number = match.group(2)
         return key, int(repetition_number)
@@ -89,6 +93,7 @@ def dset(
         path = path[1:]
     for key in path.split("/")[:-1]:
         subpath = _get_repetition_index(key)
+        _logger.debug("path=%s, key=%s, subpath=%s", path, key, subpath)
         if not subpath:
             if key not in data:
                 data[key] = {}
@@ -102,6 +107,7 @@ def dset(
             data = data[key][index]
 
     last = _get_repetition_index(path.split("/")[-1])
+    _logger.debug("path=%s, last=%s", path, last)
     if not last:
         data[path.split("/")[-1]] = value
     else:
