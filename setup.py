@@ -1,8 +1,7 @@
-#!/usr/bin/env python
-
 """The setup script."""
 
 from setuptools import find_packages, setup
+from deeppath import __version__
 
 with open("README.rst") as readme_file:
     readme = readme_file.read()
@@ -44,6 +43,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/loicleyendecker/deeppath",
-    version="0.1.4",
+    version=__version__,
     zip_safe=False,
 )
