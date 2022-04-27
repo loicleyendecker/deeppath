@@ -34,7 +34,7 @@ class InterestedPerson(Person):
 
     @classmethod
     def from_dict(cls, data, **kwargs):
-        hobbies = dget(data, "list/of/hobbies/*/title")
+        hobbies = dget(data, "list/of/hobbies[*]/title")
         additional_args = {**kwargs, "hobbies": hobbies}
         return super().from_dict(data, **additional_args)
 
@@ -60,14 +60,12 @@ def test_dget_repetitions():
     assert dget(data, "deeply/nested[-1]/path") == 4
 
 
-@pytest.mark.skip
 def test_dget_repetition_from_start():
     data = [1, 2]
     assert dget(data, "[0]") == 1
     assert dget(data, "[1]") == 2
 
 
-@pytest.mark.skip
 def test_dget_flatten_list():
     """
     Check flattening a list
@@ -79,18 +77,16 @@ def test_dget_flatten_list():
     assert dget(data, "[1]/b[*]") == [3, 4]
 
 
-@pytest.mark.skip
 def test_dget_flatten_incompatible_list_dict():
     """
     What happens if you flatten a dict with list syntax, or a list with
     dict syntax ?
     """
     data = {"list": [1, 2], "dict": {"1": 1, "2": 2}}
-    assert dget(data, "list/*") is None
-    assert dget(data, "dict[*]") is None
+    assert dget(data, "list/*") == []
+    assert dget(data, "dict[*]") == []
 
 
-@pytest.mark.skip
 def test_dget_double_flatten():
     data = {"a": {"b": {"c": 1}, "b2": {"c": 2}}}
     assert dget(data, "*") == [{"b": {"c": 1}, "b2": {"c": 2}}]
@@ -98,13 +94,12 @@ def test_dget_double_flatten():
     assert dget(data, "*/*/c") == [1, 2]
 
 
-@pytest.mark.skip
 def test_dget_flatten_excludes_unmatched_path():
     data = {"a": {"b": {"c": 1}, "b2": {"c": 2}}}
     assert dget(data, "*/b2/*") == [2]
 
 
-def test_dget_flatten_form_start():
+def test_dget_flatten_from_start():
     """
     Check the flattening works from the start of the structure
     """
@@ -112,7 +107,6 @@ def test_dget_flatten_form_start():
     assert dget(data, "*") == [1, 2]
 
 
-@pytest.mark.skip
 def test_dget_flatten_and_repetition():
     """
     Check that the flatten and repetitions features are compatible
@@ -128,16 +122,16 @@ def test_dget_flatten_and_repetition():
     assert dget(data1, "*") == [reps]
     assert dget(data1, "flattened[0]") == {"nested_in_rep": 1}
     # */ is a list, it needs explicit unfold
-    assert dget(data1, "*/nested_in_rep") is None
+    assert dget(data1, "*/nested_in_rep") == []
     assert dget(data1, "*[*]/nested_in_rep") == [1, 2]
     assert dget(data2, "*[0]") == [1, 3]
-    assert dget(data2, "*/a") is None
+    assert dget(data2, "*/a") == []
 
 
 def test_dget_flatten():
     """Check that we can successfully flatten a nested structure"""
     data = {"deeply": {"nested": [{"path": 2}, {"path": 3}, {"path": 4}]}}
-    assert dget(data, "deeply/*/path") == [[2, 3, 4]]
+    assert dget(data, "deeply/*[*]/path") == [2, 3, 4]
     data = {
         "deeply": {"nested": {"path": 2}, "other": {"path": 3}, "more": {"path": 4}}
     }
