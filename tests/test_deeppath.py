@@ -224,7 +224,7 @@ def test_dwalk():
 
 
 @pytest.mark.xfail(
-    strict=True, reason="dget assumes dicts in lists have the same structure"
+    strict=True, raises=ValueError, reason="dget assumes dicts in lists have the same structure"
 )
 def test_dget_heterogenous_dicts_in_list():
     """dget shouldn't assume all dicts in a list have the same structure. However, this may have
@@ -258,11 +258,17 @@ def test_dget_heterogenous_dicts_in_list():
     assert dget(complex_dict, "entries/data") == [
         [{"formatted": "some-error-str"}, {"values": [{"stacktrace": {"err": "why"}}]}]
     ]
-    # The assertion below fails
-    # dget assumes each dict has the same key, when it doesn't it fails as below.
-    assert dget(complex_dict, "entries/data/values") == [
-        [[{"stacktrace": {"err": "why"}}]]
-    ]
+
+    try:
+        # The assertion below fails
+        # dget assumes each dict has the same keys, when it doesn't, it fails as below.
+        assert dget(complex_dict, "entries/data/values") == [
+            [[{"stacktrace": {"err": "why"}}]]
+        ]
+    except AssertionError as exc:
+        # xfail cannot be done at assertion level.
+        # so make xfail expect ValueError to be raised
+        raise ValueError from exc
 
 
 def test_flatten():
