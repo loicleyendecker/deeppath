@@ -32,7 +32,7 @@ import deeppath
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.viewcode"]
+extensions = ["sphinx.ext.autodoc", "sphinx.ext.viewcode", "sphinxcontrib.apidoc"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -158,3 +158,7 @@ texinfo_documents = [
         "Miscellaneous",
     ),
 ]
+
+apidoc_module_dir = '../deeppath'
+apidoc_output_dir = 'apidoc'
+apidoc_separate_modules = True
