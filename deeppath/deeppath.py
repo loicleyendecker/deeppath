@@ -1,5 +1,6 @@
 """Support some XPath-like syntax for accessing nested structures"""
 
+import contextlib
 import re
 from typing import (
     Generator,
@@ -16,7 +17,8 @@ from typing import (
     Dict,
 )
 
-_REPETITION_REGEX = re.compile(r"([\w\*]+)\[([\d-]+)\]")
+_REPETITION_REGEX = re.compile(r"([\w\*]*)\[([\d\-\*]+)\]")
+TOKENIZER_REGEX = re.compile(r"(\[[^\]]+\]|[^/\[\]]+)")
 
 
 def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
@@ -32,7 +34,7 @@ def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
     return flattened_list
 
 
-def _get_repetition_index(key: str) -> Optional[Tuple[str, int]]:
+def _get_repetition_index(key: str) -> Optional[Tuple[str, Union[int, str]]]:
     """Try to match a path for a repetition.
     This will return the key and the repetition index or None if the key
     does not match the expected regex"""
@@ -40,43 +42,85 @@ def _get_repetition_index(key: str) -> Optional[Tuple[str, int]]:
     if match:
         key = match.group(1)
         repetition_number = match.group(2)
+        if repetition_number == "*":
+            return key, repetition_number
         return key, int(repetition_number)
 
     return None
 
 
-def _flatdget(data: Union[Sequence[Any], Mapping, str], key: Union[int, str]) -> Any:
-    if isinstance(data, Sequence) and isinstance(key, int):
-        return data[key]
-    if isinstance(data, Mapping) and isinstance(key, str):
-        return data[key]
-    return [_flatdget(value, key) for value in data]
-
-
-def dget(input_dict: Mapping, path: str, default: Any = None) -> Any:
-    """Gets a deeply nested value in a mapping.
-    Returns default if provided when any key doesn't match.
+def _get_sequence_index(path: str) -> Tuple[bool, Union[None, int, str]]:
     """
-    path = path.strip("/")
-    data: Union[List[Any], Mapping] = input_dict
-    try:
-        for key in path.split("/"):
-            repetition = _get_repetition_index(key)
-            if repetition:
-                key, index = repetition
-                if key != "*":
-                    data = _flatdget(data, key)
-                    data = _flatdget(data, index)
-                elif isinstance(data, Dict):
-                    data = [_flatdget(value, index) for value in data.values()]
-            else:
-                if key != "*":
-                    data = _flatdget(data, key)
-                elif not isinstance(data, Sequence):
-                    data = list(data.values())
-    except (KeyError, TypeError, IndexError):
-        return default
-    return data
+    Checks if a given path is for a repetition and returns the index if applicable
+    and a boolean indicating if it was indeed a repetition.
+
+    There are essentially three possible cases:
+    * the path is a repetition path (i.e. "key[1]", "key[-3]", or "key[*]")
+    * the path is a wildcard ("*")
+    * the path is not a repetition path at all
+
+    We need to treat the pure wildcard specifically because we still need to know
+    that this needs to be handled "as a repetition" in the sense that multiple sub-paths
+    need to be searched.
+    """
+    match = re.match(r"\[(-?[\d\*]+)\]", path)
+    if match:
+        index = match.group(1)
+        index_is_numberic = index.isnumeric() or index[0] == "-" and index[1:].isnumeric()
+        return True, (int(index) if index_is_numberic else index)
+    return False, ("*" if path == "*" else None)
+
+
+def dget(
+    data: Mapping[str, Any], path: str, default: Optional[Any] = None
+) -> Union[List[Any], Any]:
+    """
+    Match a path in a deep container.
+
+    `data` should be a mapping of str to values, other mappings or sequences
+    `path` is a /-separated list of keywords representing the path inside our container
+    `default` will be returned if the path does not match and is not using any wildcards
+
+    This function will return a single value if no wildcard (*) is used in the path. If
+    a wildcard is used, it will return a list of matching elements (so possibly an empty
+    list).
+    """
+    repetition_flag = False
+    tokenized_path = TOKENIZER_REGEX.findall(path)
+    nodes = [(data, tokenized_path)]
+    output = []
+    while nodes:
+        node, remainder = nodes.pop(0)
+        if not remainder:
+            output.append(node)
+            continue
+        next_path, *remainder = remainder
+        if not next_path:
+            continue
+
+        sequence, index = _get_sequence_index(next_path)
+        if index == "*":
+            repetition_flag = True
+            if not sequence and isinstance(node, Mapping):
+                nodes.extend((value, remainder) for value in node.values())
+            elif sequence and isinstance(node, Sequence):
+                nodes.extend((val, remainder) for val in node)
+        else:
+            if index is None:
+                if isinstance(node, Mapping):
+                    with contextlib.suppress(KeyError):
+                        nodes.append((node[next_path], remainder))
+            elif isinstance(index, int) and isinstance(node, Sequence):
+                with contextlib.suppress(IndexError):
+                    nodes.append((node[index], remainder))
+
+    # If there was an explicit repetition in the path (a "*"), then we return a
+    # list, otherwise, we return a single element
+    if repetition_flag:
+        return output
+    if output:
+        return output[0]
+    return default
 
 
 def dset(
