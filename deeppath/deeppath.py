@@ -2,7 +2,6 @@
 
 import contextlib
 import re
-from logging import getLogger
 from typing import (
     Any,
     Dict,
@@ -20,9 +19,6 @@ from typing import (
 
 _REPETITION_REGEX = re.compile(r"([^\[]+)\[([\d-]+)\]")
 TOKENIZER_REGEX = re.compile(r"(\[[^\]]+\]|[^/\[\]]+)")
-
-_logger = getLogger(__name__)
-
 
 def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
     """Flattens a nested list.
@@ -43,7 +39,6 @@ def _get_repetition_index(key: str) -> Optional[Tuple[str, Union[int, str]]]:
     does not match the expected regex"""
     match = _REPETITION_REGEX.search(key)
     if match:
-        _logger.debug("key=%s, match groups=%s", key, match.groups())
         key = match.group(1)
         repetition_number = match.group(2)
         if repetition_number == "*":
@@ -137,7 +132,6 @@ def dset(
         path = path[1:]
     for key in path.split("/")[:-1]:
         subpath = _get_repetition_index(key)
-        _logger.debug("path=%s, key=%s, subpath=%s", path, key, subpath)
         if not subpath:
             if key not in data:
                 data[key] = {}
@@ -151,7 +145,6 @@ def dset(
             data = data[key][index]
 
     last = _get_repetition_index(path.split("/")[-1])
-    _logger.debug("path=%s, last=%s", path, last)
     if not last:
         data[path.split("/")[-1]] = value
     else:
