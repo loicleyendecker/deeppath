@@ -1,5 +1,3 @@
-.. highlight:: shell
-
 ============
 Contributing
 ============
@@ -64,11 +62,10 @@ Ready to contribute? Here's how to set up `deeppath` for local development.
 
     $ git clone git@github.com:your_name_here/deeppath.git
 
-3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development::
+3. Install your local copy into a virtualenv::
 
-    $ mkvirtualenv deeppath
-    $ cd deeppath/
-    $ python setup.py develop
+    $ python -m venv .venv && sourc .venv/bin/activate
+    $ pip install -e ".[dev]"
 
 4. Create a branch for local development::
 
@@ -80,7 +77,7 @@ Ready to contribute? Here's how to set up `deeppath` for local development.
    tests, including testing other Python versions with tox::
 
     $ flake8 deeppath tests
-    $ python setup.py test or pytest
+    $ pytest
     $ tox
 
    To get flake8 and tox, just pip install them into your virtualenv.

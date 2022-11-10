@@ -2,9 +2,9 @@
 
 __author__ = """Loic Leyendecker"""
 __email__ = "loic.leyendecker@gmail.com"
-__version__ = "0.1.1"
 
-from deeppath.deeppath import dget, dset, dwalk, flatten
+from ._version import version as __version__, version_tuple
 
-__all__ = ["dget", "dset", "dwalk", "flatten"]
+from .deeppath import dget, dset, dwalk, flatten
 
+__all__ = ["dget", "dset", "dwalk", "flatten", "__version__", "version_tuple"]

@@ -30,7 +30,20 @@ Python module to easily manipulate complex nested structures
 Features
 --------
 
-* TODO
+With `~deeppath.dget`, you can access data in a complex nested
+structure. The nested structure should be a json-like structure, so
+essentially consisting of dictionary- and list-like structures::
+
+    nested_data = {
+        "users": [
+            {"surname": "Doe", "name": "John"},
+            {"name": "Jane", "surname": "Doe"},
+        ],
+        "location": {
+            "city": "London",
+            "country": "United Kingdom",
+        },
+    }
 
 Credits
 -------

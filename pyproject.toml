@@ -1,0 +1,67 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
+
+[project]
+name = "deeppath"
+description = "Python module to easily manipulate complex nested structures"
+requires-python = ">=3.6"
+keywords = ["deeppath"]
+license = {text = "MIT license"}
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+dynamic = ["version", "readme"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    'dataclasses; python_version < "3.7"',
+    "mypy",
+    "esbonio",
+    "pylint",
+    "doc8",
+    "black",
+    "towncrier",
+]
+
+[options.package_data]
+deeppath = ["py.typed"]
+"*" = ["*.rst"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["deeppath"]
+
+[tool.setuptools.dynamic]
+readme = {file = ["README.rst"]}
+version = {attr = "deeppath.__version__"}
+
+[tool.setuptools_scm]
+write_to = "deeppath/_version.py"
+
+[tool.black]
+line-length = 100
+
+[tool.mypy]
+strict = true
+
+[tool.towncrier]
+package = "deeppath"
+package_dir = "deeppath"
+filename = "HISTORY.rst"
+directory = "changelog/"
+title_format = "deeppath {version} ({project_date})"

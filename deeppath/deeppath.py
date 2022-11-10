@@ -124,7 +124,7 @@ def dget(
 
 
 def dset(
-    data: MutableMapping,
+    data: MutableMapping[str, Any],
     path: str,
     value: Any,
 ) -> None:
@@ -160,8 +160,8 @@ def dset(
 
 
 def _dwalk_with_path(
-    data: Mapping, path: List[str]
-) -> Generator[Tuple[str, Mapping], None, None]:
+    data: Mapping[str, Any], path: List[str]
+) -> Generator[Tuple[str, Mapping[str, Any]], None, None]:
     if isinstance(data, Mapping):
         for key, value in data.items():
             subpath = path + [key]
@@ -175,6 +175,6 @@ def _dwalk_with_path(
         yield "/".join(path), data
 
 
-def dwalk(data: Dict[str, Any]) -> Generator[Tuple[str, Mapping], None, None]:
+def dwalk(data: Dict[str, Any]) -> Generator[Tuple[str, Mapping[str, Any]], None, None]:
     """Generator that will yield values for each path to a leaf of a nested structure"""
     yield from _dwalk_with_path(data, [])
