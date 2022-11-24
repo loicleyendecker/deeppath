@@ -263,3 +263,24 @@ def test_flatten():
     assert flatten([[{"documentDetails": {"number": "0"}}]]) == [
         {"documentDetails": {"number": "0"}}
     ]
+
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "some_key",
+        "2@3@4",
+        "2.3.4",
+        "2-3-4",
+        "2-3.4",
+        "2-3 4",
+        "2.3 4",
+        "2 3 4_5",
+    ],
+)
+def test_dset_with_dots(key, faker):
+    d = {}
+    value = faker.name()
+    dset(d, f"1/{key}[0]", value)
+    assert d == {"1": {key: [value]}}

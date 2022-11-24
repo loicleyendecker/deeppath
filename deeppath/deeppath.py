@@ -3,21 +3,22 @@
 import contextlib
 import re
 from typing import (
+    Any,
+    Dict,
     Generator,
+    Iterable,
     List,
     Mapping,
     MutableMapping,
     MutableSequence,
-    Sequence,
-    Iterable,
-    Any,
-    Union,
     Optional,
+    Sequence,
     Tuple,
-    Dict,
+    Union,
 )
 
 _REPETITION_REGEX = re.compile(r"([\w\*]*)\[([\d\-\*]+)\]")
+_REPETITION_REGEX = re.compile(r"([^\[]+)\[([\d-]+)\]")
 TOKENIZER_REGEX = re.compile(r"(\[[^\]]+\]|[^/\[\]]+)")
 
 
