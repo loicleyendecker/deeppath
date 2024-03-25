@@ -1,29 +1,27 @@
-"""Support some XPath-like syntax for accessing nested structures"""
+"""Support some XPath-like syntax for accessing nested structures."""
+
+from __future__ import annotations
 
 import contextlib
 import re
 from typing import (
+    Any,
     Generator,
-    List,
+    Iterable,
     Mapping,
     MutableMapping,
     MutableSequence,
     Sequence,
-    Iterable,
-    Any,
-    Union,
-    Optional,
-    Tuple,
-    Dict,
 )
 
 _REPETITION_REGEX = re.compile(r"([\w\*]*)\[([\d\-\*]+)\]")
 TOKENIZER_REGEX = re.compile(r"(\[[^\]]+\]|[^/\[\]]+)")
 
 
-def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
+def flatten(nested_iterable: Iterable[Any]) -> list[Any]:
     """Flattens a nested list.
-    E.g [[[[[1]]]],[2]] -> [1,2]
+
+    E.g [[[[[1]]]],[2]] -> [1,2].
     """
     flattened_list = []
     for item in nested_iterable:
@@ -34,10 +32,12 @@ def flatten(nested_iterable: Iterable[Any]) -> List[Any]:
     return flattened_list
 
 
-def _get_repetition_index(key: str) -> Optional[Tuple[str, Union[int, str]]]:
+def _get_repetition_index(key: str) -> tuple[str, int | str] | None:
     """Try to match a path for a repetition.
+
     This will return the key and the repetition index or None if the key
-    does not match the expected regex"""
+    does not match the expected regex.
+    """
     match = _REPETITION_REGEX.search(key)
     if match:
         key = match.group(1)
@@ -49,10 +49,10 @@ def _get_repetition_index(key: str) -> Optional[Tuple[str, Union[int, str]]]:
     return None
 
 
-def _get_sequence_index(path: str) -> Tuple[bool, Union[None, int, str]]:
-    """
-    Checks if a given path is for a repetition and returns the index if applicable
-    and a boolean indicating if it was indeed a repetition.
+def _get_sequence_index(path: str) -> tuple[bool, None | int | str]:
+    """Check if a given path is for a repetition.
+
+    Returns the index if applicable and a boolean indicating if it was a repetition.
 
     There are essentially three possible cases:
     * the path is a repetition path (i.e. "key[1]", "key[-3]", or "key[*]")
@@ -72,10 +72,11 @@ def _get_sequence_index(path: str) -> Tuple[bool, Union[None, int, str]]:
 
 
 def dget(
-    data: Mapping[str, Any], path: str, default: Optional[Any] = None
-) -> Union[List[Any], Any]:
-    """
-    Match a path in a deep container.
+    data: Mapping[str, Any],
+    path: str,
+    default: Any | None = None,
+) -> list[Any] | Any:
+    """Match a path in a deep container.
 
     `data` should be a mapping of str to values, other mappings or sequences
     `path` is a /-separated list of keywords representing the path inside our container
@@ -105,14 +106,13 @@ def dget(
                 nodes.extend((value, remainder) for value in node.values())
             elif sequence and isinstance(node, Sequence):
                 nodes.extend((val, remainder) for val in node)
-        else:
-            if index is None:
-                if isinstance(node, Mapping):
-                    with contextlib.suppress(KeyError):
-                        nodes.append((node[next_path], remainder))
-            elif isinstance(index, int) and isinstance(node, Sequence):
-                with contextlib.suppress(IndexError):
-                    nodes.append((node[index], remainder))
+        elif index is None:
+            if isinstance(node, Mapping):
+                with contextlib.suppress(KeyError):
+                    nodes.append((node[next_path], remainder))
+        elif isinstance(index, int) and isinstance(node, Sequence):
+            with contextlib.suppress(IndexError):
+                nodes.append((node[index], remainder))
 
     # If there was an explicit repetition in the path (a "*"), then we return a
     # list, otherwise, we return a single element
@@ -128,7 +128,7 @@ def dset(
     path: str,
     value: Any,
 ) -> None:
-    """Set a key in a deeply nested structure"""
+    """Set a key in a deeply nested structure."""
     if path.startswith("/"):
         path = path[1:]
     for key in path.split("/")[:-1]:
@@ -138,12 +138,12 @@ def dset(
                 data[key] = {}
             data = data[key]
         else:
-            key, index = subpath
-            if key not in data:
-                data[key] = [{}]
-            elif len(data[key]) == index:
-                data[key].append({})
-            data = data[key][index]
+            subkey, index = subpath
+            if subkey not in data:
+                data[subkey] = [{}]
+            elif len(data[subkey]) == index:
+                data[subkey].append({})
+            data = data[subkey][index]
 
     last = _get_repetition_index(path.split("/")[-1])
     if not last:
@@ -152,19 +152,19 @@ def dset(
         key, index = last
         if key not in data:
             data[key] = [value]
+        elif len(data[key]) == index:
+            data[key].append(value)
         else:
-            if len(data[key]) == index:
-                data[key].append(value)
-            else:
-                data[key][index] = value
+            data[key][index] = value
 
 
 def _dwalk_with_path(
-    data: Mapping[str, Any], path: List[str]
-) -> Generator[Tuple[str, Mapping[str, Any]], None, None]:
+    data: Mapping[str, Any],
+    path: list[str],
+) -> Generator[tuple[str, Mapping[str, Any]], None, None]:
     if isinstance(data, Mapping):
         for key, value in data.items():
-            subpath = path + [key]
+            subpath = [*path, key]
             yield from _dwalk_with_path(value, subpath)
     elif isinstance(data, MutableSequence):
         for index, value in enumerate(data):
@@ -175,6 +175,6 @@ def _dwalk_with_path(
         yield "/".join(path), data
 
 
-def dwalk(data: Dict[str, Any]) -> Generator[Tuple[str, Mapping[str, Any]], None, None]:
-    """Generator that will yield values for each path to a leaf of a nested structure"""
+def dwalk(data: dict[str, Any]) -> Generator[tuple[str, Mapping[str, Any]], None, None]:
+    """Yield values for each path to a leaf of a nested structure."""
     yield from _dwalk_with_path(data, [])

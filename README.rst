@@ -6,18 +6,16 @@ deeppath
 .. image:: https://img.shields.io/pypi/v/deeppath.svg
         :target: https://pypi.python.org/pypi/deeppath
 
-.. image:: https://img.shields.io/travis/loicleyendecker/deeppath.svg
-        :target: https://travis-ci.com/loicleyendecker/deeppath
+.. image:: https://github.com/loicleyendecker/deeppath/actions/workflows/python-package.yml/badge.svg
+        :target: https://github.com/loicleyendecker/deeppath/actions/workflows/python-package.yml
 
 .. image:: https://readthedocs.org/projects/deeppath/badge/?version=latest
         :target: https://deeppath.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-
-.. image:: https://pyup.io/repos/github/loicleyendecker/deeppath/shield.svg
-     :target: https://pyup.io/repos/github/loicleyendecker/deeppath/
-     :alt: Updates
-
+.. image:: https://static.pepy.tech/badge/deeppath
+     :target: https://pepy.tech/project/deeppath
+     :alt: Downloads
 
 
 Python module to easily manipulate complex nested structures
