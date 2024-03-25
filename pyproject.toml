@@ -7,7 +7,7 @@ name = "deeppath"
 description = "Python module to easily manipulate complex nested structures"
 requires-python = ">=3.6"
 keywords = ["deeppath"]
-license = {text = "MIT license"}
+license = { text = "MIT license" }
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
@@ -34,9 +34,10 @@ dev = [
     "doc8",
     "black",
     "towncrier",
+    "ruff",
 ]
 
-[options.package_data]
+[tool.setuptools.package-data]
 deeppath = ["py.typed"]
 "*" = ["*.rst"]
 
@@ -47,8 +48,8 @@ include-package-data = true
 include = ["deeppath"]
 
 [tool.setuptools.dynamic]
-readme = {file = ["README.rst"]}
-version = {attr = "deeppath.__version__"}
+readme = { file = ["README.rst"] }
+version = { attr = "deeppath.__version__" }
 
 [tool.setuptools_scm]
 write_to = "deeppath/_version.py"
@@ -65,3 +66,7 @@ package_dir = "deeppath"
 filename = "HISTORY.rst"
 directory = "changelog/"
 title_format = "deeppath {version} ({project_date})"
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100
