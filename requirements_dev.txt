@@ -16,3 +16,4 @@ doc8
 black
 towncrier
 ruff
+urllib3>=2.6.0 # not directly required, pinned by Snyk to avoid a vulnerability
