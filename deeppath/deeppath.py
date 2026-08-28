@@ -159,22 +159,28 @@ def dset(
 
 
 def _dwalk_with_path(
-    data: Mapping[str, Any],
+    data: Any,
     path: list[str],
-) -> Generator[tuple[str, Mapping[str, Any]], None, None]:
+) -> Generator[tuple[str, Any], None, None]:
     if isinstance(data, Mapping):
         for key, value in data.items():
             subpath = [*path, key]
             yield from _dwalk_with_path(value, subpath)
     elif isinstance(data, MutableSequence):
         for index, value in enumerate(data):
-            subpath = path[:]
-            subpath[-1] = subpath[-1] + f"[{index}]"
+            if path:
+                subpath = path[:]
+                subpath[-1] = subpath[-1] + f"[{index}]"
+            else:
+                subpath = [f"[{index}]"]
             yield from _dwalk_with_path(value, subpath)
     else:
         yield "/".join(path), data
 
 
-def dwalk(data: dict[str, Any]) -> Generator[tuple[str, Mapping[str, Any]], None, None]:
-    """Yield values for each path to a leaf of a nested structure."""
+def dwalk(data: Mapping[str, Any] | Sequence[Any]) -> Generator[tuple[str, Any], None, None]:
+    """Yield values for each path to a leaf of a nested structure.
+
+    `data` can be a mapping or a sequence at the top level.
+    """
     yield from _dwalk_with_path(data, [])

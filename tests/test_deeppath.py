@@ -217,6 +217,36 @@ def test_dwalk():
     ]
 
 
+def test_dwalk_top_level_list():
+    """dwalk should support a top-level list, not just a top-level mapping"""
+    data = [1, 2, "three"]
+    assert list(dwalk(data)) == [
+        ("[0]", 1),
+        ("[1]", 2),
+        ("[2]", "three"),
+    ]
+
+
+def test_dwalk_top_level_list_of_mappings():
+    """A top-level list of mappings should mix list and mapping path segments"""
+    data = [{"a": 1}, {"a": 2, "b": {"c": 3}}]
+    assert list(dwalk(data)) == [
+        ("[0]/a", 1),
+        ("[1]/a", 2),
+        ("[1]/b/c", 3),
+    ]
+
+
+def test_dwalk_top_level_nested_list():
+    """A top-level list of lists should chain the index segments"""
+    data = [[1, 2], [3]]
+    assert list(dwalk(data)) == [
+        ("[0][0]", 1),
+        ("[0][1]", 2),
+        ("[1][0]", 3),
+    ]
+
+
 def test_dget_heterogenous_dicts_in_list():
     """dget shouldn't assume all dicts in a list have the same structure. However, this may have
     wider implications. A design decision is required as this behaviour is now becoming controversial
