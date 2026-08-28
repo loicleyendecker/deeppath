@@ -52,6 +52,31 @@ def test_dget_basic():
     assert dget(data, "deeply/nested/path/toomuch", default=1) == 1
 
 
+def test_dget_strict():
+    """Check that strict mode raises instead of returning the default"""
+    data = {"deeply": {"nested": {"path": 2}}}
+    assert dget(data, "deeply/nested/path", strict=True) == 2
+
+    with pytest.raises(KeyError):
+        dget(data, "some/wrong/path", strict=True)
+
+    with pytest.raises(KeyError):
+        dget(data, "some/wrong/path", default=1, strict=True)
+
+    # Wildcard paths are unaffected by strict mode, they just return an empty list,
+    # even if a missing key earlier in the path means the wildcard is never reached
+    assert dget(data, "deeply/*/nonexistent", strict=True) == []
+    assert dget(data, "some/wrong/path/*", strict=True) == []
+
+
+def test_dget_wildcard_short_circuits_on_missing_key():
+    """A wildcard anywhere in the path should always return a list, even if an
+    earlier segment fails to match and the wildcard is never actually reached"""
+    data = {"deeply": {"nested": {"path": 2}}}
+    assert dget(data, "some/wrong/path/*") == []
+    assert dget(data, "some/wrong[*]/path") == []
+
+
 def test_dget_repetitions():
     """Check that repetitions are correctly handled"""
     data = {"deeply": {"nested": [{"path": 2}, {"path": 3}, {"path": 4}]}}
