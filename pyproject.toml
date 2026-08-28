@@ -24,6 +24,7 @@ dynamic = ["version", "readme"]
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-benchmark",
     'dataclasses; python_version < "3.7"',
     "mypy",
     "esbonio",
@@ -56,6 +57,13 @@ line-length = 100
 
 [tool.mypy]
 strict = true
+
+[tool.pytest.ini_options]
+# Keep `pytest`/CI fast: benchmarks live here but are excluded from default
+# collection (they're not correctness tests and shared CI runners are too noisy
+# for perf numbers to mean anything anyway). Run them explicitly with
+# `pytest tests/benchmarks`.
+norecursedirs = ["tests/benchmarks"]
 
 [tool.towncrier]
 package = "deeppath"

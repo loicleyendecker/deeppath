@@ -1,0 +1,60 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  benchmark:
+    name: Run benchmarks and check for regressions
+    runs-on: ubuntu-latest
+    # Benchmarks are compared against a rolling baseline cached from master (see the
+    # actions/cache step below), not against a gh-pages history/dashboard - that would
+    # need `permissions: contents: write` to auto-push commits to a gh-pages branch,
+    # which is a bigger repo footprint than this workflow takes on by default.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # A single fixed version, not the full correctness-CI matrix: comparing
+          # timings across interpreter versions would be meaningless, and this job
+          # is about tracking regressions over time on one consistent target.
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Run benchmarks
+        run: pytest tests/benchmarks --benchmark-json output.json
+
+      - name: Restore cached baseline
+        uses: actions/cache@v4
+        with:
+          path: ./cache
+          # A SHA-suffixed key so actions/cache always saves a fresh entry at the end
+          # of this job (an exact-key cache hit is never re-saved); restore-keys falls
+          # back to the most recent prior entry so there's always a baseline to compare
+          # against. PR runs get their own cache scope per GitHub's cache rules, so
+          # comparing a PR against master's baseline never pollutes master's rolling one.
+          key: ${{ runner.os }}-benchmark-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-benchmark-
+
+      - name: Compare against baseline
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: deeppath benchmarks
+          tool: "pytest"
+          output-file-path: output.json
+          external-data-json-path: ./cache/benchmark-data.json
+          # CI runners are shared, variable hardware - this whole benchmark suite was
+          # built around discovering just how noisy performance measurement can be,
+          # so the threshold is intentionally lenient to avoid
+          # false-positive failures on ordinary run-to-run variance.
+          alert-threshold: "200%"
+          fail-on-alert: true

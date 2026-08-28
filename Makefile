@@ -56,6 +56,9 @@ test: ## run tests quickly with the default Python
 test-all: ## run tests on every Python version with tox
 	tox
 
+benchmark: ## run performance benchmarks (excluded from `make test`, see pyproject.toml)
+	pytest tests/benchmarks
+
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source deeppath -m pytest
 	coverage report -m
