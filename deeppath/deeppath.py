@@ -120,6 +120,63 @@ def _get_repetition_index(key: str) -> tuple[str, int | str] | None:
     return key[:start], index
 
 
+def _walk(node: Any, tokenized_path: list[_Segment]) -> Generator[Any, None, None]:
+    """Yield every value that completely matches tokenized_path, in document order.
+
+    Shared traversal core for `dget` and `has`: `dget` collects every yielded value into
+    a list, `has` just asks for one and stops, which is what gives `has` its short
+    circuit - once its `for _ in _walk(...): return True` stops pulling, the generator
+    suspends and never builds the rest of a fan-out.
+    """
+    length = len(tokenized_path)
+    if length == 0:
+        yield node
+        return
+    current_level: list[tuple[Any, int]] = [(node, 0)]
+    while current_level:
+        next_level: list[tuple[Any, int]] = []
+        for cur_node, cur_idx in current_level:
+            seg = tokenized_path[cur_idx]
+            kind = seg.kind
+            next_idx = cur_idx + 1
+            if kind == "wildcard_map":
+                with contextlib.suppress(AttributeError):
+                    for value in cur_node.values():
+                        if next_idx == length:
+                            yield value
+                        else:
+                            next_level.append((value, next_idx))
+            elif kind == "wildcard_seq":
+                if isinstance(cur_node, list):
+                    for val in cur_node:
+                        if next_idx == length:
+                            yield val
+                        else:
+                            next_level.append((val, next_idx))
+                elif isinstance(cur_node, Sequence):
+                    for val in cur_node:
+                        if next_idx == length:
+                            yield val
+                        else:
+                            next_level.append((val, next_idx))
+            elif kind == "key":
+                with contextlib.suppress(KeyError, TypeError):
+                    value = cur_node[seg.value]
+                    if next_idx == length:
+                        yield value
+                    else:
+                        next_level.append((value, next_idx))
+            elif kind == "index":
+                if isinstance(cur_node, Sequence):
+                    with contextlib.suppress(IndexError):
+                        value = cur_node[cast(int, seg.value)]
+                        if next_idx == length:
+                            yield value
+                        else:
+                            next_level.append((value, next_idx))
+        current_level = next_level
+
+
 def dget(
     data: Mapping[str, Any],
     path: str,
@@ -143,55 +200,7 @@ def dget(
     # A wildcard makes this a repetition path even if a missing key earlier in the
     # path means the wildcard segment itself is never reached during traversal.
     repetition_flag = any(seg.kind in ("wildcard_map", "wildcard_seq") for seg in tokenized_path)
-    length = len(tokenized_path)
-    current_level: list[tuple[Any, int]] = [(data, 0)]
-    output = []
-    while current_level:
-        next_level: list[tuple[Any, int]] = []
-        for node, idx in current_level:
-            if idx == length:
-                output.append(node)
-                continue
-            seg = tokenized_path[idx]
-            kind = seg.kind
-            if kind == "wildcard_map":
-                # No isinstance check: .values() is a reliable enough signal for
-                # "mapping-like" on its own (no common non-mapping type has it), and
-                # duck-typing it accepts Mapping-like objects that don't register with
-                # the ABC, matching Mapping and dict both through the same code path.
-                with contextlib.suppress(AttributeError):
-                    for value in node.values():
-                        next_level.append((value, idx + 1))
-            elif kind == "wildcard_seq":
-                # Kept as isinstance: unlike .values(), plain iteration doesn't
-                # distinguish "sequence" from "any iterable" - a bare `for val in node`
-                # would silently iterate a dict's *keys* here instead of correctly not
-                # matching at all.
-                if isinstance(node, list):
-                    for val in node:
-                        next_level.append((val, idx + 1))
-                elif isinstance(node, Sequence):
-                    for val in node:
-                        next_level.append((val, idx + 1))
-            elif kind == "key":
-                # No isinstance check: every non-mapping raises TypeError (not
-                # KeyError) when subscripted with a string key, so the exception
-                # itself distinguishes "not mapping-like" from "key not present".
-                with contextlib.suppress(KeyError, TypeError):
-                    next_level.append((node[seg.value], idx + 1))
-            elif kind == "index":
-                # `seg.value` is always an int here: it's the only way _classify_segment
-                # constructs an "index" segment. cast(), not isinstance(), tells mypy
-                # that without re-checking something already guaranteed at no cost.
-                #
-                # isinstance(node, Sequence) is still a real check, though: a dict with
-                # an integer key (e.g. {3: "x"}) accepts int subscripting without
-                # raising, so dropping this would let a dict silently match a
-                # "[3]"-style path segment.
-                if isinstance(node, Sequence):
-                    with contextlib.suppress(IndexError):
-                        next_level.append((node[cast(int, seg.value)], idx + 1))
-        current_level = next_level
+    output = list(_walk(data, tokenized_path))
 
     # If there was an explicit repetition in the path (a "*"), then we return a
     # list, otherwise, we return a single element
@@ -202,6 +211,27 @@ def dget(
     if strict:
         raise KeyError(f"Path {path!r} did not match the given structure")
     return default
+
+
+def has(data: Mapping[str, Any], path: str) -> bool:
+    """Check whether a path matches anything in a deep container.
+
+    `data` should be a mapping of str to values, other mappings or sequences
+    `path` is a /-separated list of keywords representing the path inside our container
+
+    Returns True as soon as the path resolves to at least one value, even if that value
+    is falsy (e.g. None, 0, or an empty list) - this checks whether the path *matches*,
+    not whether the matched value is truthy. For a wildcard path, True means at least one
+    element matched.
+
+    Shares its traversal with `dget` via `_walk`; the short circuit falls out of
+    generator laziness - once this stops pulling after the first yield, `_walk` never
+    builds the rest of a fan-out.
+    """
+    tokenized_path = _tokenize_path(path)
+    for _ in _walk(data, tokenized_path):
+        return True
+    return False
 
 
 def dset(

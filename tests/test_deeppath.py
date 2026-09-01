@@ -6,7 +6,7 @@ from typing import List
 
 import pytest
 
-from deeppath import dget, dset, dwalk, flatten
+from deeppath import dget, dset, dwalk, flatten, has
 
 
 @dataclass(frozen=True)
@@ -75,6 +75,46 @@ def test_dget_wildcard_short_circuits_on_missing_key():
     data = {"deeply": {"nested": {"path": 2}}}
     assert dget(data, "some/wrong/path/*") == []
     assert dget(data, "some/wrong[*]/path") == []
+
+
+def test_has_basic():
+    """has() should match whether or not the matched value is truthy"""
+    data = {"deeply": {"nested": {"path": 2, "falsy": None, "zero": 0, "empty": []}}}
+    assert has(data, "deeply/nested/path")
+    assert not has(data, "some/wrong/path")
+    assert not has(data, "deeply/nested/path/toomuch")
+
+    # A match on a falsy value is still a match
+    assert has(data, "deeply/nested/falsy")
+    assert has(data, "deeply/nested/zero")
+    assert has(data, "deeply/nested/empty")
+
+
+def test_has_repetitions():
+    """has() over indexed and wildcard paths"""
+    data = {"deeply": {"nested": [{"path": 2}, {"path": 3}, {"path": 4}]}}
+    assert has(data, "deeply/nested[0]/path")
+    assert not has(data, "deeply/nested[10]/path")
+    assert has(data, "deeply/nested[-1]/path")
+
+    # A wildcard matches if at least one element matches
+    assert has(data, "deeply/nested[*]/path")
+    assert not has(data, "deeply/nested[*]/missing")
+    assert not has(data, "deeply/nested/*")  # bare "*" doesn't match a list, see dget
+
+
+def test_has_wildcard_short_circuits_on_missing_key():
+    """Same short-circuit-to-no-match behavior as dget for a wildcard past a
+    missing earlier segment"""
+    data = {"deeply": {"nested": {"path": 2}}}
+    assert not has(data, "some/wrong/path/*")
+    assert not has(data, "some/wrong[*]/path")
+
+
+def test_has_empty_path():
+    """An empty path always matches the root, same as dget"""
+    assert has({"a": 1}, "")
+    assert has([], "")
 
 
 def test_dget_repetitions():
