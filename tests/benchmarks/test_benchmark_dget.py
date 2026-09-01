@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from deeppath import dget, dset, dwalk, flatten
+from deeppath import dget, dset, dwalk, flatten, has
 
 
 def make_deep_dict(depth: int) -> dict:
@@ -111,6 +111,63 @@ def test_dget_realistic_wildcard(benchmark):
 def test_dget_realistic_nested_wildcard(benchmark):
     result = benchmark(lambda: dget(REALISTIC_DOC, "users[*]/profile/tags[*]"))
     assert len(result) == 600
+
+
+# Same paths/data as the dget benchmarks above, so a has-vs-dget comparison in the same
+# report is a direct read of has()'s short circuit, not a different-shape comparison.
+# The wildcard cases in particular all match on the very first element scanned (every
+# item/user has the field being checked), which is exactly where has() should look
+# cheapest next to dget() building the full result list.
+
+
+@pytest.mark.benchmark(group="has-simple")
+def test_has_deep_path(benchmark):
+    result = benchmark(lambda: has(DEEP_DICT, DEEP_PATH))
+    assert result is True
+
+
+@pytest.mark.benchmark(group="has-simple")
+def test_has_wide_dict_hit(benchmark):
+    result = benchmark(lambda: has(WIDE_DICT, "key250"))
+    assert result is True
+
+
+@pytest.mark.benchmark(group="has-simple")
+def test_has_wide_dict_miss(benchmark):
+    result = benchmark(lambda: has(WIDE_DICT, "nonexistent/path"))
+    assert result is False
+
+
+@pytest.mark.benchmark(group="has-simple")
+def test_has_list_index(benchmark):
+    result = benchmark(lambda: has(LIST_OF_DICTS, "items[250]/name"))
+    assert result is True
+
+
+@pytest.mark.benchmark(group="has-wildcard")
+def test_has_list_wildcard_bracket(benchmark):
+    result = benchmark(lambda: has(LIST_OF_DICTS, "items[*]/name"))
+    assert result is True
+
+
+@pytest.mark.benchmark(group="has-wildcard")
+def test_has_list_wildcard_star_key(benchmark):
+    # Mirrors dget_list_wildcard_star_key: bare "*" never matches a list, so this
+    # exercises has()'s no-match path, not a short circuit.
+    result = benchmark(lambda: has(LIST_OF_DICTS, "items/*/name"))
+    assert result is False
+
+
+@pytest.mark.benchmark(group="has-wildcard")
+def test_has_realistic_wildcard(benchmark):
+    result = benchmark(lambda: has(REALISTIC_DOC, "users[*]/profile/address/city"))
+    assert result is True
+
+
+@pytest.mark.benchmark(group="has-wildcard")
+def test_has_realistic_nested_wildcard(benchmark):
+    result = benchmark(lambda: has(REALISTIC_DOC, "users[*]/profile/tags[*]"))
+    assert result is True
 
 
 @pytest.mark.benchmark(group="dset")
