@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 from typing import (
     Any,
     Generator,
@@ -482,3 +483,53 @@ def dwalk(data: Mapping[str, Any] | Sequence[Any]) -> Generator[tuple[str, Any],
     `data` can be a mapping or a sequence at the top level.
     """
     yield from _dwalk_with_path(data, [])
+
+
+def _search_with_path(
+    data: Any,
+    path: list[str],
+    compiled: re.Pattern[str],
+) -> Generator[tuple[str, Any], None, None]:
+    if isinstance(data, Mapping):
+        for key, value in data.items():
+            subpath = [*path, key]
+            if compiled.search(key):
+                yield "/".join(subpath), value
+            yield from _search_with_path(value, subpath, compiled)
+    elif isinstance(data, MutableSequence):
+        for index, value in enumerate(data):
+            if path:
+                subpath = path[:]
+                subpath[-1] = subpath[-1] + f"[{index}]"
+            else:
+                subpath = [f"[{index}]"]
+            yield from _search_with_path(value, subpath, compiled)
+
+
+def dsearch(
+    data: Mapping[str, Any] | Sequence[Any],
+    pattern: str | re.Pattern[str],
+) -> Generator[tuple[str, Any], None, None]:
+    """Find every key matching `pattern`, at any depth - covers dpath's "**/key" and
+    jsonpath-ng's "$..key" descendant search, which `dget`'s own wildcards can't do
+    since they need the path shape spelled out in advance.
+
+    `data` can be a mapping or a sequence at the top level.
+    `pattern` is always treated as a regex via `re.search` (not a plain string equality
+    check) - this is a search tool, not a path-matching one like `dget`/`has`. A plain
+    key name like "price" still works as a pattern (it matches itself), so this isn't
+    any harder to use for the simple case; `re.search` rather than `re.fullmatch` means
+    it also matches as a substring unless the caller anchors it (e.g. "^price$").
+
+    Yields (path, value) in document order for every match. `value` is whatever's
+    there, not just a leaf - a matched key's value can itself be a nested dict or list.
+    Continues searching inside a match too, so a nested key with a matching name is
+    also found on its own, not just as part of the outer match's subtree.
+
+    List elements are walked transparently - a match can be found inside a list, and a
+    list can appear as a match's value - but a list index is never itself treated as a
+    key to search, only dict keys are (matching dpath/jsonpath-ng: they search key
+    names, not array positions).
+    """
+    compiled = re.compile(pattern)
+    yield from _search_with_path(data, [], compiled)

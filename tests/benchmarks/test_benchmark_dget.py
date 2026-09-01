@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from deeppath import ddelete, dget, dset, dwalk, flatten, has
+from deeppath import ddelete, dget, dsearch, dset, dwalk, flatten, has
 
 
 def make_deep_dict(depth: int) -> dict:
@@ -252,6 +252,34 @@ def test_dwalk_realistic(benchmark):
 def test_dwalk_list_of_dicts(benchmark):
     result = benchmark(lambda: list(dwalk(LIST_OF_DICTS)))
     assert len(result) == 1500  # 500 items x (id, name, meta/active)
+
+
+# dsearch is conceptually dwalk plus a filter, and unlike dwalk it also visits
+# non-leaf nodes - same data as the dwalk benchmarks above, so this is directly
+# comparable to them: how much a full-tree key search costs on top of a plain walk.
+
+
+@pytest.mark.benchmark(group="dsearch")
+def test_dsearch_realistic(benchmark):
+    # "city" appears once per user (200 matches), nested under profile/address -
+    # comparable in scope to dwalk_realistic.
+    result = benchmark(lambda: list(dsearch(REALISTIC_DOC, r"^city$")))
+    assert len(result) == 200
+
+
+@pytest.mark.benchmark(group="dsearch")
+def test_dsearch_list_of_dicts(benchmark):
+    result = benchmark(lambda: list(dsearch(LIST_OF_DICTS, r"^name$")))
+    assert len(result) == 500
+
+
+@pytest.mark.benchmark(group="dsearch")
+def test_dsearch_no_match(benchmark):
+    # A non-matching search still has to visit every node before concluding there's
+    # nothing to yield - the full-tree-scan cost with none of the match overhead,
+    # comparable to dget_wide_dict_miss's role among the dget benchmarks.
+    result = benchmark(lambda: list(dsearch(REALISTIC_DOC, r"^nonexistent$")))
+    assert result == []
 
 
 @pytest.mark.benchmark(group="flatten")

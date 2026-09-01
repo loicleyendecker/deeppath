@@ -1,12 +1,13 @@
 """Validate the dget function that accesses values in nested dictionaries, using the xpath syntax"""
 
 import datetime
+import re
 from dataclasses import dataclass
 from typing import List
 
 import pytest
 
-from deeppath import ddelete, dget, dset, dwalk, flatten, has
+from deeppath import ddelete, dget, dsearch, dset, dwalk, flatten, has
 
 
 @dataclass(frozen=True)
@@ -448,6 +449,68 @@ def test_dwalk_top_level_nested_list():
         ("[0][1]", 2),
         ("[1][0]", 3),
     ]
+
+
+def test_dsearch_finds_key_at_any_depth():
+    """Covers dpath's "**/key" / jsonpath-ng's "$..key" descendant search - dget's own
+    wildcards can't do this since they need the path shape spelled out in advance"""
+    data = {"a": {"b": {"price": 5}}, "c": {"price": 9}}
+    assert list(dsearch(data, r"^price$")) == [("a/b/price", 5), ("c/price", 9)]
+
+
+def test_dsearch_inside_list_of_dicts():
+    data = {"items": [{"price": 1}, {"price": 2, "other": 3}]}
+    assert list(dsearch(data, r"^price$")) == [
+        ("items[0]/price", 1),
+        ("items[1]/price", 2),
+    ]
+
+
+def test_dsearch_matches_non_leaf_values_too():
+    """A matched key's value can be an entire nested dict/list, not just a leaf -
+    dsearch isn't restricted to leaves the way dwalk is"""
+    data = {"config": {"nested": "x"}, "other": 1}
+    assert list(dsearch(data, r"^config$")) == [("config", {"nested": "x"})]
+
+
+def test_dsearch_continues_inside_a_match():
+    """A nested key with a matching name is found on its own too, not swallowed as
+    just part of the outer match's subtree - this is descendant search, not
+    "stop once found\""""
+    data = {"price": {"price": 1, "other": 2}}
+    assert list(dsearch(data, r"^price$")) == [
+        ("price", {"price": 1, "other": 2}),
+        ("price/price", 1),
+    ]
+
+
+def test_dsearch_pattern_is_always_a_regex():
+    """A plain key name works as a pattern (it matches itself via re.search), but so
+    does a real regex - this is a search tool, not a plain string equality check"""
+    data = {"user_id": 1, "product_id": 2, "name": "x"}
+    assert list(dsearch(data, r"_id$")) == [("user_id", 1), ("product_id", 2)]
+
+
+def test_dsearch_accepts_a_precompiled_pattern():
+    data = {"a": {"price": 5}}
+    assert list(dsearch(data, re.compile(r"^price$"))) == [("a/price", 5)]
+
+
+def test_dsearch_list_indices_are_never_keys():
+    """List elements are walked transparently, but a list index is never itself
+    treated as a key to search - matching dpath/jsonpath-ng, which search key names,
+    not array positions"""
+    data = {"items": [1, 2, 3]}
+    assert list(dsearch(data, r"^[0-9]+$")) == []
+
+
+def test_dsearch_top_level_list():
+    data = [{"price": 1}, {"other": 2}]
+    assert list(dsearch(data, r"^price$")) == [("[0]/price", 1)]
+
+
+def test_dsearch_no_match():
+    assert list(dsearch({"a": 1}, r"^nonexistent$")) == []
 
 
 def test_dget_heterogenous_dicts_in_list():
