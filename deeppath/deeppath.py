@@ -16,30 +16,38 @@ from typing import (
     cast,
 )
 
-_SegmentKind = Literal["key", "wildcard_map", "index", "wildcard_seq"]
+_SegmentKind = Literal["key", "wildcard_map", "index", "wildcard_seq", "slice"]
 
 
 class _Segment(NamedTuple):
     """A single classified path segment, computed once per `dget` call instead of
     being re-derived from the raw string on every node visited during traversal.
 
-    `value` holds the dict key (str) for "key", or the sequence index (int) for
-    "index"; it is unused (None) for the wildcard kinds.
+    `value` holds the dict key (str) for "key", the sequence index (int) for "index",
+    or the parsed slice object for "slice"; it is unused (None) for the wildcard kinds.
     """
 
     kind: _SegmentKind
-    value: str | int | None
+    value: str | int | slice | None
 
 
 def _classify_segment(token: str) -> _Segment:
     if token == "*":
         return _Segment("wildcard_map", None)
     if token.startswith("[") and token.endswith("]"):
-        parsed = _parse_index(token[1:-1])
+        inner = token[1:-1]
+        parsed = _parse_index(inner)
         if parsed == "*":
             return _Segment("wildcard_seq", None)
         if isinstance(parsed, int):
             return _Segment("index", parsed)
+        # _parse_index() deliberately never recognizes "a:b" - _get_repetition_index()
+        # (dset's own path parser) shares it, and dset has no sensible "set one value
+        # at a slice" semantic. Slicing is checked separately, only here, so it stays
+        # a dget/has/ddelete-only capability rather than leaking into dset.
+        parsed_slice = _parse_slice(inner)
+        if parsed_slice is not None:
+            return _Segment("slice", parsed_slice)
         # An unparseable "[...]" (e.g. "[abc]") is used verbatim as a literal key,
         # matching the historical behavior of the string-based matcher.
     return _Segment("key", token)
@@ -91,15 +99,45 @@ def flatten(nested_iterable: Iterable[Any]) -> list[Any]:
     return flattened_list
 
 
+def _parse_signed_int(text: str) -> int | None:
+    """Parse an optional leading "-" followed by digits into an int, or None if `text`
+    isn't in that shape (including the empty string)."""
+    is_negative = text.startswith("-")
+    digits = text[1:] if is_negative else text
+    if digits.isdigit():
+        return -int(digits) if is_negative else int(digits)
+    return None
+
+
 def _parse_index(inner: str) -> int | str | None:
     """Parse the content of a "[...]" group into an int index, "*", or None if invalid."""
     if inner == "*":
         return "*"
-    is_negative = inner.startswith("-")
-    digits = inner[1:] if is_negative else inner
-    if digits.isdigit():
-        return -int(digits) if is_negative else int(digits)
-    return None
+    return _parse_signed_int(inner)
+
+
+def _parse_slice(inner: str) -> slice | None:
+    """Parse "start:stop" or "start:stop:step" (each component optional, e.g. "1:",
+    ":3", "::2", "::-1") into a `slice` object, or None if the shape doesn't fit - more
+    than two colons, or a non-empty component that isn't a valid signed integer.
+    """
+    if ":" not in inner:
+        return None
+    parts = inner.split(":")
+    if len(parts) > 3:
+        return None
+    components: list[int | None] = []
+    for part in parts:
+        if part == "":
+            components.append(None)
+            continue
+        value = _parse_signed_int(part)
+        if value is None:
+            return None
+        components.append(value)
+    while len(components) < 3:
+        components.append(None)
+    return slice(*components)
 
 
 def _get_repetition_index(key: str) -> tuple[str, int | str] | None:
@@ -174,6 +212,22 @@ def _walk(node: Any, tokenized_path: list[_Segment]) -> Generator[Any, None, Non
                             yield value
                         else:
                             next_level.append((value, next_idx))
+            elif kind == "slice":
+                # `seg.value` is always a slice here: it's the only way
+                # _classify_segment constructs a "slice" segment. `slice.indices()`
+                # resolves it to concrete, in-bounds (start, stop, step) for this
+                # specific node - handling negative/omitted bounds and reverse steps
+                # the same way a plain a_list[a:b:c] would, rather than reimplementing
+                # that ourselves. Like a bounded wildcard_seq: every element the slice
+                # selects fans out and continues the rest of the path independently.
+                if isinstance(cur_node, Sequence):
+                    seg_slice = cast(slice, seg.value)
+                    for index in range(*seg_slice.indices(len(cur_node))):
+                        val = cur_node[index]
+                        if next_idx == length:
+                            yield val
+                        else:
+                            next_level.append((val, next_idx))
         current_level = next_level
 
 
@@ -199,7 +253,9 @@ def dget(
     tokenized_path = _tokenize_path(path)
     # A wildcard makes this a repetition path even if a missing key earlier in the
     # path means the wildcard segment itself is never reached during traversal.
-    repetition_flag = any(seg.kind in ("wildcard_map", "wildcard_seq") for seg in tokenized_path)
+    repetition_flag = any(
+        seg.kind in ("wildcard_map", "wildcard_seq", "slice") for seg in tokenized_path
+    )
     output = list(_walk(data, tokenized_path))
 
     # If there was an explicit repetition in the path (a "*"), then we return a
@@ -293,6 +349,20 @@ def _locate(node: Any, tokenized_path: list[_Segment]) -> Generator[tuple[Any, A
                             yield cur_node, idx_value, value
                         else:
                             next_level.append((value, next_idx))
+            elif kind == "slice":
+                # Yielding the concrete, absolute index (not a position within the
+                # slice) is what lets ddelete's existing descending-index-sort logic
+                # handle a slice delete correctly with no changes of its own - it
+                # already sorts and removes any set of int-keyed matches from the same
+                # list highest-index-first.
+                if isinstance(cur_node, Sequence):
+                    seg_slice = cast(slice, seg.value)
+                    for index in range(*seg_slice.indices(len(cur_node))):
+                        val = cur_node[index]
+                        if next_idx == length:
+                            yield cur_node, index, val
+                        else:
+                            next_level.append((val, next_idx))
         current_level = next_level
 
 

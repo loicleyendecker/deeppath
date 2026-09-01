@@ -185,6 +185,76 @@ def test_ddelete_immutable_sequence_is_a_graceful_no_op():
     assert data == {"items": (1, 2, 3)}
 
 
+def test_dget_slice():
+    """A slice acts like a bounded wildcard: it always returns a list (even a
+    single-element or empty one), same as a "*"/"[*]" wildcard would"""
+    data = {"items": [0, 1, 2, 3, 4]}
+    assert dget(data, "items[1:3]") == [1, 2]
+    assert dget(data, "items[:3]") == [0, 1, 2]
+    assert dget(data, "items[2:]") == [2, 3, 4]
+    assert dget(data, "items[:]") == [0, 1, 2, 3, 4]
+    assert dget(data, "items[::2]") == [0, 2, 4]
+    assert dget(data, "items[::-1]") == [4, 3, 2, 1, 0]
+    assert dget(data, "items[-3:-1]") == [2, 3]
+
+    # Out-of-bounds and empty ranges behave like plain Python slicing: no error,
+    # just an empty result - never a crash, and never treated as "no match" for
+    # purposes of the default/strict machinery, since a slice is always a wildcard.
+    assert dget(data, "items[10:20]") == []
+    assert dget(data, "items[-1:1]") == []
+
+
+def test_dget_slice_continues_the_path_per_element():
+    """Each element the slice selects fans out and continues the rest of the path
+    independently, exactly like [*] does but bounded to the slice's range"""
+    data = {"items": [{"name": f"item{i}"} for i in range(5)]}
+    assert dget(data, "items[1:3]/name") == ["item1", "item2"]
+
+
+def test_has_slice():
+    data = {"items": [{"name": f"item{i}"} for i in range(5)]}
+    assert has(data, "items[1:3]/name")
+    assert not has(data, "items[10:20]/name")
+
+
+def test_ddelete_slice():
+    """Deleting a slice removes every selected element and shifts the rest down,
+    same as ddelete does for a single index or a full wildcard"""
+    data = {"items": [0, 1, 2, 3, 4]}
+    assert ddelete(data, "items[1:3]") is True
+    assert data == {"items": [0, 3, 4]}
+
+
+def test_ddelete_stepped_slice():
+    """A stepped slice deletes a non-contiguous set of indices in one call - this
+    exercises ddelete's descending-index-sort logic on indices that aren't adjacent"""
+    data = {"items": [0, 1, 2, 3, 4]}
+    assert ddelete(data, "items[::2]") is True
+    assert data == {"items": [1, 3]}
+
+
+def test_dget_malformed_slice_falls_back_to_literal_key():
+    """A "[...]" that looks like it might be a slice but isn't valid (too many colons,
+    or a non-integer component) is used verbatim as a literal key - including the
+    brackets - the same fallback an unparseable bracket like "[abc]" already gets.
+
+    The bracket is its own path token, separate from the key before it (the same way
+    "items[0]" tokenizes to "items" then "[0]"), so the literal key it falls back to
+    is "[1:2:3:4]" itself, not "items[1:2:3:4]" as one combined string."""
+    data = {"items": {"[1:2:3:4]": "a", "[1:abc]": "b"}}
+    assert dget(data, "items[1:2:3:4]") == "a"
+    assert dget(data, "items[1:abc]") == "b"
+
+
+def test_dset_with_colon_bracket_path_is_unaffected():
+    """dset shares its own path parsing with dget's tokenizer only through
+    _parse_index(), which never recognizes "a:b" - a colon-bracket path segment is
+    still just a literal dict key for dset, exactly as before slicing existed"""
+    data: dict = {}
+    dset(data, "items[1:3]/x", 42)
+    assert data == {"items[1:3]": {"x": 42}}
+
+
 def test_dget_repetitions():
     """Check that repetitions are correctly handled"""
     data = {"deeply": {"nested": [{"path": 2}, {"path": 3}, {"path": 4}]}}

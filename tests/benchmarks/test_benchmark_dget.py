@@ -113,6 +113,24 @@ def test_dget_realistic_nested_wildcard(benchmark):
     assert len(result) == 600
 
 
+@pytest.mark.benchmark(group="dget-slice")
+def test_dget_list_slice_bounded(benchmark):
+    # 300 of the 500 items -- same order of magnitude as the wildcard benchmarks above.
+    result = benchmark(lambda: dget(LIST_OF_DICTS, "items[100:400]/name"))
+    assert len(result) == 300
+
+
+@pytest.mark.benchmark(group="dget-slice")
+def test_dget_list_slice_full(benchmark):
+    # "items[:]" selects the same 500 elements as "items[*]" in
+    # test_dget_list_wildcard_bracket above - same data, same result, deliberately set
+    # up as a direct comparison. Wildcard iterates the list directly; slice goes
+    # through range(*slice.indices(len(node))) + repeated __getitem__, so this is
+    # where any overhead from the index-based approach would show up.
+    result = benchmark(lambda: dget(LIST_OF_DICTS, "items[:]/name"))
+    assert len(result) == 500
+
+
 # Same paths/data as the dget benchmarks above, so a has-vs-dget comparison in the same
 # report is a direct read of has()'s short circuit, not a different-shape comparison.
 # The wildcard cases in particular all match on the very first element scanned (every
