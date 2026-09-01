@@ -6,7 +6,7 @@ from typing import List
 
 import pytest
 
-from deeppath import dget, dset, dwalk, flatten, has
+from deeppath import ddelete, dget, dset, dwalk, flatten, has
 
 
 @dataclass(frozen=True)
@@ -115,6 +115,74 @@ def test_has_empty_path():
     """An empty path always matches the root, same as dget"""
     assert has({"a": 1}, "")
     assert has([], "")
+
+
+def test_ddelete_basic():
+    """A plain key delete removes just that key, leaving siblings untouched"""
+    data = {"a": {"b": 1, "c": 2}}
+    assert ddelete(data, "a/b") is True
+    assert data == {"a": {"c": 2}}
+    assert not has(data, "a/b")
+    assert dget(data, "a/b", default="GONE") == "GONE"
+
+
+def test_ddelete_no_match():
+    """Deleting a path that doesn't match anything is a no-op that reports False"""
+    data = {"a": 1}
+    assert ddelete(data, "b/c") is False
+    assert data == {"a": 1}
+
+
+def test_ddelete_empty_path():
+    """An empty path never deletes anything - there's no container to remove the root
+    itself from"""
+    data = {"a": 1}
+    assert ddelete(data, "") is False
+    assert data == {"a": 1}
+
+
+def test_ddelete_list_index_shifts():
+    """Deleting a list element actually removes it and shifts later items down,
+    rather than leaving a hole (e.g. a None placeholder) in its place"""
+    data = {"items": [10, 20, 30]}
+    assert ddelete(data, "items[1]") is True
+    assert data == {"items": [10, 30]}
+
+
+def test_ddelete_negative_index():
+    data = {"items": [10, 20, 30]}
+    assert ddelete(data, "items[-1]") is True
+    assert data == {"items": [10, 20]}
+
+
+def test_ddelete_wildcard_removes_every_match():
+    """A wildcard path deletes every match, consistent with dget/has treating a
+    wildcard as "every element", not just the first"""
+    data = {"items": [{"drop": 1, "keep": "a"}, {"drop": 2, "keep": "b"}, {"keep": "c"}]}
+    assert ddelete(data, "items[*]/drop") is True
+    assert data == {"items": [{"keep": "a"}, {"keep": "b"}, {"keep": "c"}]}
+
+
+def test_ddelete_wildcard_seq_multiple_indices_no_shift_bug():
+    """Deleting several list elements via a single wildcard call must not corrupt
+    later deletions by shifting indices out from under them"""
+    data = {"items": [10, 20, 30, 40, 50]}
+    assert ddelete(data, "items[*]") is True
+    assert data == {"items": []}
+
+
+def test_ddelete_nested_wildcards():
+    data = {"groups": [{"vals": [1, 2, 3]}, {"vals": [4, 5]}, {"vals": [6]}]}
+    assert ddelete(data, "groups[*]/vals[*]") is True
+    assert data == {"groups": [{"vals": []}, {"vals": []}, {"vals": []}]}
+
+
+def test_ddelete_immutable_sequence_is_a_graceful_no_op():
+    """A wildcard fanning into a tuple can't delete from it (tuples are immutable) -
+    that must not be silently reported as a successful delete"""
+    data = {"items": (1, 2, 3)}
+    assert ddelete(data, "items[0]") is False
+    assert data == {"items": (1, 2, 3)}
 
 
 def test_dget_repetitions():

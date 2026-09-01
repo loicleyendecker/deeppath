@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from deeppath import dget, dset, dwalk, flatten, has
+from deeppath import ddelete, dget, dset, dwalk, flatten, has
 
 
 def make_deep_dict(depth: int) -> dict:
@@ -192,6 +192,36 @@ def test_dset_deep_path(benchmark):
 
     result = benchmark(build)
     assert dget(result, DEEP_PATH) == 42
+
+
+@pytest.mark.benchmark(group="ddelete")
+def test_ddelete_single(benchmark):
+    def delete_one():
+        # Fresh structure each call since ddelete mutates - built from a plain dict
+        # literal (not dset) so construction cost stays negligible next to the delete
+        # itself, matching the single-key shape of dget_wide_dict_hit/deep_path_get.
+        data = {"a": {"b": 1, "c": 2}}
+        ok = ddelete(data, "a/b")
+        return ok, data
+
+    ok, result = benchmark(delete_one)
+    assert ok is True
+    assert result == {"a": {"c": 2}}
+
+
+@pytest.mark.benchmark(group="ddelete")
+def test_ddelete_wildcard_bulk(benchmark):
+    def delete_all():
+        # Fresh 500-item structure each call, then delete every match in one wildcard
+        # call - exercises the descending-index-sort-then-delete path at the same
+        # scale as dget_list_wildcard_bracket/dset_build_new, not just a single delete.
+        data = {"items": [{"id": i} for i in range(500)]}
+        ok = ddelete(data, "items[*]")
+        return ok, data
+
+    ok, result = benchmark(delete_all)
+    assert ok is True
+    assert result == {"items": []}
 
 
 @pytest.mark.benchmark(group="dwalk")

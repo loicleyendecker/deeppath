@@ -234,6 +234,123 @@ def has(data: Mapping[str, Any], path: str) -> bool:
     return False
 
 
+def _locate(node: Any, tokenized_path: list[_Segment]) -> Generator[tuple[Any, Any, Any], None, None]:
+    """Yield (parent, key_or_index, value) for every value that completely matches
+    tokenized_path, in document order.
+
+    A deliberate near-duplicate of `_walk`, not a variant sharing its code: `_walk`
+    yields bare values, which is enough for `dget`/`has` and lets those two branches
+    iterate directly over `.values()` / a plain `for`. Locating a value's parent+key for
+    deletion needs `.items()` / `enumerate()` instead, which costs a tuple per fanned-out
+    element - measured at 17-27% slower on wildcard-heavy `dget`/`has` calls when that
+    cost was pushed into a unified `_walk`. `dget`/`has` are the hot path; `ddelete` is
+    not, so the duplication is the trade made here on purpose, not an oversight.
+    """
+    length = len(tokenized_path)
+    if length == 0:
+        yield None, None, node
+        return
+    current_level: list[tuple[Any, int]] = [(node, 0)]
+    while current_level:
+        next_level: list[tuple[Any, int]] = []
+        for cur_node, cur_idx in current_level:
+            seg = tokenized_path[cur_idx]
+            kind = seg.kind
+            next_idx = cur_idx + 1
+            if kind == "wildcard_map":
+                with contextlib.suppress(AttributeError):
+                    for key, value in cur_node.items():
+                        if next_idx == length:
+                            yield cur_node, key, value
+                        else:
+                            next_level.append((value, next_idx))
+            elif kind == "wildcard_seq":
+                if isinstance(cur_node, list):
+                    for index, val in enumerate(cur_node):
+                        if next_idx == length:
+                            yield cur_node, index, val
+                        else:
+                            next_level.append((val, next_idx))
+                elif isinstance(cur_node, Sequence):
+                    for index, val in enumerate(cur_node):
+                        if next_idx == length:
+                            yield cur_node, index, val
+                        else:
+                            next_level.append((val, next_idx))
+            elif kind == "key":
+                with contextlib.suppress(KeyError, TypeError):
+                    value = cur_node[seg.value]
+                    if next_idx == length:
+                        yield cur_node, seg.value, value
+                    else:
+                        next_level.append((value, next_idx))
+            elif kind == "index":
+                if isinstance(cur_node, Sequence):
+                    with contextlib.suppress(IndexError):
+                        idx_value = cast(int, seg.value)
+                        value = cur_node[idx_value]
+                        if next_idx == length:
+                            yield cur_node, idx_value, value
+                        else:
+                            next_level.append((value, next_idx))
+        current_level = next_level
+
+
+def ddelete(data: MutableMapping[str, Any], path: str) -> bool:
+    """Remove whatever a path matches.
+
+    `data` should be a mapping of str to values, other mappings or sequences
+    `path` is a /-separated list of keywords representing the path inside our container
+
+    Returns True if at least one match was removed, False if the path didn't match
+    anything (an empty path never removes anything - there's no container to remove the
+    root itself from).
+
+    A wildcard path removes every match, consistent with `dget`/`has` treating a
+    wildcard as "every element", not just the first. Deleting a list element actually
+    removes it and shifts later indices down (like `del a_list[i]`) rather than leaving
+    a hole in its place.
+    """
+    tokenized_path = _tokenize_path(path)
+    list_deletions: list[tuple[MutableSequence[Any], int]] = []
+    other_deletions: list[tuple[Any, Any]] = []
+    for parent, key, _value in _locate(data, tokenized_path):
+        if parent is None:
+            continue
+        if isinstance(key, int) and isinstance(parent, MutableSequence):
+            list_deletions.append((parent, key))
+        else:
+            other_deletions.append((parent, key))
+
+    if not list_deletions and not other_deletions:
+        return False
+
+    # A plain `del` can still fail here (e.g. a wildcard fanning into an immutable
+    # Sequence like a tuple), and that must not be reported as a successful delete, so
+    # this tracks real success rather than suppressing and assuming.
+    deleted_any = False
+    for parent, key in other_deletions:
+        try:
+            del parent[key]
+            deleted_any = True
+        except (KeyError, TypeError):
+            pass
+
+    # Highest index first within each list, so removing one match doesn't shift the
+    # position of another match still to be removed from that same list. Deletions
+    # against different lists don't interact, so a single global sort is enough - it
+    # still preserves descending order among entries that do share a list.
+    list_deletions.sort(key=lambda item: item[1], reverse=True)
+    for parent, index in list_deletions:
+        try:
+            del parent[index]
+            deleted_any = True
+        except (IndexError, TypeError):
+            pass
+
+    return deleted_any
+
+
 def dset(
     data: MutableMapping[str, Any],
     path: str,
