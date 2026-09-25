@@ -8,6 +8,7 @@ from ._version import version_tuple
 from .deeppath import ddelete, dget, dsearch, dset, dwalk, flatten, has
 
 __all__ = [
+    "__version__",
     "ddelete",
     "dget",
     "dsearch",
@@ -15,6 +16,5 @@ __all__ = [
     "dwalk",
     "flatten",
     "has",
-    "__version__",
     "version_tuple",
 ]

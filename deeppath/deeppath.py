@@ -186,13 +186,10 @@ def _walk(node: Any, tokenized_path: list[_Segment]) -> Generator[Any, None, Non
                         else:
                             next_level.append((value, next_idx))
             elif kind == "wildcard_seq":
-                if isinstance(cur_node, list):
-                    for val in cur_node:
-                        if next_idx == length:
-                            yield val
-                        else:
-                            next_level.append((val, next_idx))
-                elif isinstance(cur_node, Sequence):
+                # `list` comes first because it's the common case and much cheaper to
+                # check than the Sequence ABC; isinstance tries the types in order and
+                # stops at the first match, so lists never pay for the ABC check.
+                if isinstance(cur_node, (list, Sequence)):
                     for val in cur_node:
                         if next_idx == length:
                             yield val
@@ -213,7 +210,7 @@ def _walk(node: Any, tokenized_path: list[_Segment]) -> Generator[Any, None, Non
                             yield value
                         else:
                             next_level.append((value, next_idx))
-            elif kind == "slice":
+            elif kind == "slice" and isinstance(cur_node, Sequence):
                 # `seg.value` is always a slice here: it's the only way
                 # _classify_segment constructs a "slice" segment. `slice.indices()`
                 # resolves it to concrete, in-bounds (start, stop, step) for this
@@ -221,14 +218,13 @@ def _walk(node: Any, tokenized_path: list[_Segment]) -> Generator[Any, None, Non
                 # the same way a plain a_list[a:b:c] would, rather than reimplementing
                 # that ourselves. Like a bounded wildcard_seq: every element the slice
                 # selects fans out and continues the rest of the path independently.
-                if isinstance(cur_node, Sequence):
-                    seg_slice = cast(slice, seg.value)
-                    for index in range(*seg_slice.indices(len(cur_node))):
-                        val = cur_node[index]
-                        if next_idx == length:
-                            yield val
-                        else:
-                            next_level.append((val, next_idx))
+                seg_slice = cast(slice, seg.value)
+                for index in range(*seg_slice.indices(len(cur_node))):
+                    val = cur_node[index]
+                    if next_idx == length:
+                        yield val
+                    else:
+                        next_level.append((val, next_idx))
         current_level = next_level
 
 
@@ -324,13 +320,8 @@ def _locate(
                         else:
                             next_level.append((value, next_idx))
             elif kind == "wildcard_seq":
-                if isinstance(cur_node, list):
-                    for index, val in enumerate(cur_node):
-                        if next_idx == length:
-                            yield cur_node, index, val
-                        else:
-                            next_level.append((val, next_idx))
-                elif isinstance(cur_node, Sequence):
+                # Same list-first fast path as in `_walk`.
+                if isinstance(cur_node, (list, Sequence)):
                     for index, val in enumerate(cur_node):
                         if next_idx == length:
                             yield cur_node, index, val
@@ -352,20 +343,19 @@ def _locate(
                             yield cur_node, idx_value, value
                         else:
                             next_level.append((value, next_idx))
-            elif kind == "slice":
+            elif kind == "slice" and isinstance(cur_node, Sequence):
                 # Yielding the concrete, absolute index (not a position within the
                 # slice) is what lets ddelete's existing descending-index-sort logic
                 # handle a slice delete correctly with no changes of its own - it
                 # already sorts and removes any set of int-keyed matches from the same
                 # list highest-index-first.
-                if isinstance(cur_node, Sequence):
-                    seg_slice = cast(slice, seg.value)
-                    for index in range(*seg_slice.indices(len(cur_node))):
-                        val = cur_node[index]
-                        if next_idx == length:
-                            yield cur_node, index, val
-                        else:
-                            next_level.append((val, next_idx))
+                seg_slice = cast(slice, seg.value)
+                for index in range(*seg_slice.indices(len(cur_node))):
+                    val = cur_node[index]
+                    if next_idx == length:
+                        yield cur_node, index, val
+                    else:
+                        next_level.append((val, next_idx))
         current_level = next_level
 
 
