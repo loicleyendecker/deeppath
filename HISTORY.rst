@@ -4,6 +4,48 @@ History
 
 .. towncrier release notes start
 
+deeppath 1.1.0 (2026-09-25)
+===========================
+
+Features
+--------
+
+- Add ``ddelete(data, path)`` to remove whatever a path matches. Wildcards
+  delete every match, and removing a list element shifts later indices down.
+- Add ``dsearch(data, pattern)`` to find every key matching a regular
+  expression, at any depth.
+- Add ``has(data, path)`` to check whether a path matches anything. It stops at
+  the first match, including on wildcard paths.
+- Add ``strict=True`` to ``dget`` to raise ``KeyError`` instead of returning
+  ``default`` when a path does not match.
+- Support ``[start:stop]`` and ``[start:stop:step]`` slices in ``dget``,
+  ``has`` and ``ddelete`` paths.
+- ``dwalk`` accepts a list at the top level.
+
+
+Improved Documentation
+----------------------
+
+- Document the full API in the README and usage guide: wildcards, slices,
+  ``strict``, ``has``, ``dset``, ``ddelete``, ``dsearch``, ``dwalk`` and
+  ``flatten``.
+
+
+Deprecations and Removals
+-------------------------
+
+- Drop support for Python 3.6, 3.7 and 3.8. deeppath now requires Python 3.9 or
+  later.
+
+
+Misc
+----
+
+- Rewrite path parsing and traversal: path segments are classified once per
+  call instead of on every node visited. Wildcard reads are up to 28% faster
+  and bracket-indexed ``dset`` up to 3x faster.
+
+
 deeppath 0.1.6 (2022-11-10)
 ===========================
 
