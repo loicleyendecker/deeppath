@@ -53,6 +53,7 @@ version = { attr = "deeppath.__version__" }
 write_to = "deeppath/_version.py"
 
 [tool.black]
+target-version = ["py39"]
 line-length = 100
 
 [tool.mypy]

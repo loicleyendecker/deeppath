@@ -336,9 +336,7 @@ def test_dget_flatten():
     """Check that we can successfully flatten a nested structure"""
     data = {"deeply": {"nested": [{"path": 2}, {"path": 3}, {"path": 4}]}}
     assert dget(data, "deeply/*[*]/path") == [2, 3, 4]
-    data = {
-        "deeply": {"nested": {"path": 2}, "other": {"path": 3}, "more": {"path": 4}}
-    }
+    data = {"deeply": {"nested": {"path": 2}, "other": {"path": 3}, "more": {"path": 4}}}
     assert dget(data, "deeply/*/path") == [2, 3, 4]
 
 
@@ -388,9 +386,7 @@ def test_dset():
 
     data = {}
     dset(data, "nested[0]/repetition/value", 1)
-    assert data == {
-        "nested": [{"repetition": {"value": 1}}]
-    }, "Repetition with nested value OK"
+    assert data == {"nested": [{"repetition": {"value": 1}}]}, "Repetition with nested value OK"
 
     data = {}
     dset(data, "multiple[0]/repetition[0]", 1)
@@ -476,7 +472,7 @@ def test_dsearch_matches_non_leaf_values_too():
 def test_dsearch_continues_inside_a_match():
     """A nested key with a matching name is found on its own too, not swallowed as
     just part of the outer match's subtree - this is descendant search, not
-    "stop once found\""""
+    "stop once found\" """
     data = {"price": {"price": 1, "other": 2}}
     assert list(dsearch(data, r"^price$")) == [
         ("price", {"price": 1, "other": 2}),
@@ -542,13 +538,12 @@ def test_dget_heterogenous_dicts_in_list():
     ]
 
     assert dget(complex_dict, "[*]/entries[*]/data") == [
-        {"formatted": "some-error-str"}, {"values": [{"stacktrace": {"err": "why"}}]}
+        {"formatted": "some-error-str"},
+        {"values": [{"stacktrace": {"err": "why"}}]},
     ]
 
     # Even if each dictionary does not have all the keys, we shouldn't fail
-    assert dget(complex_dict, "[*]/entries[*]/data/values") == [
-        [{"stacktrace": {"err": "why"}}]
-    ]
+    assert dget(complex_dict, "[*]/entries[*]/data/values") == [[{"stacktrace": {"err": "why"}}]]
 
 
 def test_flatten():

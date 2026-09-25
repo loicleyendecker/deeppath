@@ -291,7 +291,9 @@ def has(data: Mapping[str, Any], path: str) -> bool:
     return False
 
 
-def _locate(node: Any, tokenized_path: list[_Segment]) -> Generator[tuple[Any, Any, Any], None, None]:
+def _locate(
+    node: Any, tokenized_path: list[_Segment]
+) -> Generator[tuple[Any, Any, Any], None, None]:
     """Yield (parent, key_or_index, value) for every value that completely matches
     tokenized_path, in document order.
 

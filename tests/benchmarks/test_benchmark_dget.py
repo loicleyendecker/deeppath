@@ -32,7 +32,9 @@ def make_wide_dict(width: int) -> dict:
 
 
 def make_list_of_dicts(n: int) -> dict:
-    return {"items": [{"id": i, "name": f"item{i}", "meta": {"active": i % 2 == 0}} for i in range(n)]}
+    return {
+        "items": [{"id": i, "name": f"item{i}", "meta": {"active": i % 2 == 0}} for i in range(n)]
+    }
 
 
 def make_realistic_document() -> dict:
