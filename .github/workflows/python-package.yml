@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9, "3.10", 3.11, 3.12]
+        python-version: [3.9, "3.10", 3.11, 3.12]
 
     steps:
     - uses: actions/checkout@v3
@@ -46,3 +46,8 @@ jobs:
         pylint deeppath --fail-under=9.0
     - name: Lint with ruff
       run: ruff check deeppath
+    - name: Check formatting with black
+      # Only on one version: black's output can differ between the releases
+      # pip resolves for each Python, so checking once keeps the result stable.
+      if: matrix.python-version == '3.12'
+      run: black --check --diff deeppath tests
