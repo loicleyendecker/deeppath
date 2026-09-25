@@ -510,8 +510,8 @@ def dsearch(
     data: Mapping[str, Any] | Sequence[Any],
     pattern: str | re.Pattern[str],
 ) -> Generator[tuple[str, Any], None, None]:
-    """Find every key matching `pattern`, at any depth - covers dpath's "**/key" and
-    jsonpath-ng's "$..key" descendant search, which `dget`'s own wildcards can't do
+    """Find every key matching `pattern`, at any depth - covers dpath's ``"**/key"`` and
+    jsonpath-ng's ``"$..key"`` descendant search, which `dget`'s own wildcards can't do
     since they need the path shape spelled out in advance.
 
     `data` can be a mapping or a sequence at the top level.
